@@ -89,50 +89,6 @@ graph TB
     style DB fill:#99f,stroke:#333,stroke-width:2px
 ```
 
-### Agent Workflow Pipeline
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant API as FastAPI
-    participant Orch as Orchestrator
-    participant Ext as Extractor
-    participant Enh as Enhancer
-    participant Ana as Analyzer
-    participant Mat as Matcher
-    participant Scr as Screener
-    participant Rec as Recommender
-    participant DB as Database
-    
-    User->>API: Upload Resume (PDF)
-    API->>Orch: process_application()
-    
-    Orch->>Ext: Extract PDF → JSON
-    Ext-->>Orch: structured_data
-    
-    Orch->>Enh: Enhance Profile
-    Enh-->>Orch: enhanced_data
-    
-    Orch->>Ana: Analyze Skills & Experience
-    Ana-->>Orch: skills_analysis
-    
-    Orch->>Mat: Match with Jobs
-    Mat->>DB: Query job listings
-    DB-->>Mat: Database jobs
-    Mat->>Mat: Fetch live market trends
-    Mat-->>Orch: matched_jobs (DB + Live)
-    
-    Orch->>Scr: Screen Candidate
-    Scr-->>Orch: screening_score + red_flags
-    
-    Orch->>Rec: Generate Recommendation
-    Rec-->>Orch: hiring_status + verdict
-    
-    Orch-->>API: Complete workflow_context
-    API->>DB: Save candidate record
-    API-->>User: Full Report + UI Display
-```
-
 ### Data Flow Architecture
 
 ```mermaid
