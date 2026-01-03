@@ -12,3 +12,16 @@ CREATE TABLE IF NOT EXISTS jobs (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS candidates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename TEXT NOT NULL,
+    name TEXT,
+    email TEXT,
+    phone TEXT,
+    score INTEGER,
+    recommendation TEXT,
+    full_report TEXT, -- JSON stored as text
+    status TEXT DEFAULT 'Analyzed',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

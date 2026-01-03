@@ -16,9 +16,10 @@ class BaseAgent:
         
         # Initialize Client based on provider
         if self.provider == "nebius":
+            actual_key = self.api_key or Config.NEBIUS_API_KEY or "placeholder"
             self.client = OpenAI(
                 base_url=Config.NEBIUS_BASE_URL,
-                api_key=self.api_key or "placeholder", # Requires key
+                api_key=actual_key,
             )
             self.model = Config.NEBIUS_MODEL
         else: # Default to Ollama

@@ -48,8 +48,9 @@ async def analyze_resume(
     temp_path = UPLOAD_DIR / file.filename
     try:
         # 1. Determine Provider
-        provider = "nebius" if nebius_key else "ollama"
-        api_key = nebius_key if nebius_key else "ollama"
+        provider = "nebius" if nebius_key else Config.DEFAULT_PROVIDER
+        # api_key is passed to agents; they handle the fallback to Config.NEBIUS_API_KEY themselves now
+        api_key = nebius_key
         
         logger.info(f"Processing candidate resume using {provider}...")
 

@@ -116,7 +116,7 @@ class MatcherAgent(BaseAgent):
                 scored_jobs.append(
                     {
                         "title": f"{job['title']} at {job['company']}",
-                        "match_score": f"{match_score}%",
+                        "match_score": match_score, # Numeric
                         "location": job["location"],
                         "salary_range": job.get("salary_range", "Competitive"),
                         "requirements": job["requirements"],
@@ -126,7 +126,7 @@ class MatcherAgent(BaseAgent):
 
         print(f" ==>>> Scored Jobs: {len(scored_jobs)}")
         # Sort by match score
-        scored_jobs.sort(key=lambda x: int(x["match_score"].rstrip("%")), reverse=True)
+        scored_jobs.sort(key=lambda x: x["match_score"], reverse=True)
 
         return {
             "matched_jobs": scored_jobs[:3],  # Top 3 matches
@@ -138,11 +138,7 @@ class MatcherAgent(BaseAgent):
         self, skills: List[str], experience_level: str
     ) -> List[Dict[str, Any]]:
         """Search jobs based on skills and experience level"""
-        query = """
-        SELECT * FROM jobs
-        WHERE experience_level = ?
-        AND (
-        """
+        query = "SELECT * FROM jobs WHERE experience_level = ?"
         query_conditions = []
         params = [experience_level]
 
@@ -151,7 +147,8 @@ class MatcherAgent(BaseAgent):
             query_conditions.append("requirements LIKE ?")
             params.append(f"%{skill}%")
 
-        query += " OR ".join(query_conditions) + ")"
+        if query_conditions:
+            query += " AND (" + " OR ".join(query_conditions) + ")"
 
         try:
             with sqlite3.connect(self.db.db_path) as conn:

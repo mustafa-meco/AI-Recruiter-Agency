@@ -2,6 +2,7 @@ from typing import Dict, Any
 from .base_agent import BaseAgent
 from datetime import datetime
 import ast
+import json
 
 
 class ScreenerAgent(BaseAgent):
@@ -14,7 +15,8 @@ class ScreenerAgent(BaseAgent):
             - Skill match percentage
             - Cultural fit indicators
             - Red flags or concerns
-            Provide comprehensive screening reports.""",
+            - Specific scoring (0-100)
+            Provide comprehensive reports.""",
             provider=provider,
             api_key=api_key
         )
@@ -30,19 +32,27 @@ class ScreenerAgent(BaseAgent):
              print(f"ScreenerAgent: Failed to parse input: {content}")
              workflow_context = {}
              
+        # Prepare focused context
+        focused_context = {
+            "candidate_name": workflow_context.get("extraction_results", {}).get("structured_data", {}).get("Personal Info", {}).get("Name", "Candidate"),
+            "skills_analysis": workflow_context.get("analysis_results", {}).get("skills_analysis", {}),
+            "job_matches": workflow_context.get("job_matches", {}).get("matched_jobs", [])
+        }
+             
         prompt = f"""
-        Conduct a comprehensive screening of this candidate.
-        Context: {str(workflow_context)}
+        Conduct a comprehensive screening of this candidate based on the profile and job matches.
+        
+        Candidate Data: {json.dumps(focused_context, indent=2)}
         
         Evaluate:
-        1. Qualification alignment
+        1. Qualification alignment with matched jobs
         2. Experience relevance
-        3. Potential red flags
+        3. Skill gaps or red flags
         
-        Return a JSON object with:
+        Return a STRICT JSON object with no markdown formatting:
         {{
-            "screening_report": "detailed textual report",
-            "screening_score": number (0-100),
+            "screening_report": "detailed textual report (3-4 sentences)",
+            "screening_score": number (integer 0-100),
             "red_flags": ["flag1", "flag2"]
         }}
         """
@@ -53,6 +63,6 @@ class ScreenerAgent(BaseAgent):
         return {
             "screening_report": parsed.get("screening_report", "No report generated"),
             "screening_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "screening_score": parsed.get("screening_score", 50),
+            "screening_score": int(parsed.get("screening_score", 50)),
             "red_flags": parsed.get("red_flags", [])
         }

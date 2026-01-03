@@ -2,6 +2,7 @@ from typing import Dict, Any
 from .base_agent import BaseAgent
 from datetime import datetime
 import ast
+import json
 
 
 class RecommenderAgent(BaseAgent):
@@ -29,13 +30,25 @@ class RecommenderAgent(BaseAgent):
              print(f"RecommenderAgent: Failed to parse input: {content}")
              workflow_context = {}
 
+        # Prepare focused context to avoid token limits and noise
+        focused_context = {
+            "candidate_name": workflow_context.get("extraction_results", {}).get("structured_data", {}).get("Personal Info", {}).get("Name", "Candidate"),
+            "skills": workflow_context.get("analysis_results", {}).get("skills_analysis", {}).get("technical_skills", []),
+            "experience": workflow_context.get("analysis_results", {}).get("skills_analysis", {}).get("years_of_experience", "Unknown"),
+            "matches": workflow_context.get("job_matches", {}).get("matched_jobs", []),
+            "screening_score": workflow_context.get("screening_results", {}).get("screening_score", 0),
+            "red_flags": workflow_context.get("screening_results", {}).get("red_flags", [])
+        }
+
         prompt = f"""
-        Provide a final hiring recommendation based on the full workflow data.
-        Data: {str(workflow_context)}
+        Provide a final hiring recommendation based on the candidate summary below.
         
-        Return a JSON object with:
+        Candidate Data: {json.dumps(focused_context, indent=2)}
+        
+        Return a STRICT JSON object with these keys:
         {{
-            "recommendation": "detailed textual recommendation",
+            "hiring_status": "Recommended" or "Not Recommended" or "Pending Review",
+            "recommendation": "Detailed justification for the verdict (2-3 sentences)",
             "next_steps": ["step1", "step2"],
             "confidence_level": "Low/Medium/High"
         }}
@@ -43,10 +56,14 @@ class RecommenderAgent(BaseAgent):
 
         response = self._query_llm(prompt)
         parsed = self._parse_json_safely(response)
+        
+        if not parsed or "recommendation" not in parsed:
+            print(f"RecommenderAgent Error: Invalid JSON response: {response}")
 
         return {
-            "final_recommendation": parsed.get("recommendation", "No recommendation generated"),
-            "next_steps": parsed.get("next_steps", []),
-            "recommendation_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "confidence_level": parsed.get("confidence_level", "Medium"),
+             "hiring_status": parsed.get("hiring_status", "Pending Review"),
+             "recommendation": parsed.get("recommendation", "Use manual review. Agent failed to generate recommendation."),
+             "next_steps": parsed.get("next_steps", []),
+             "recommendation_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+             "confidence_level": parsed.get("confidence_level", "Medium"),
         }

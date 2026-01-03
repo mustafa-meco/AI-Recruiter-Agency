@@ -48,6 +48,10 @@ class OrchestratorAgent(BaseAgent):
             extraction_res = await self.extractor.run(
                 [{"role": "user", "content": str(resume_data)}]
             )
+            workflow_context.update({
+                "extraction_results": extraction_res,
+                "current_stage": "enhancement"
+            })
             
             # Step B: Profile Enhancement
             enhanced_data = await self.enhancer.run(
