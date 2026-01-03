@@ -13,6 +13,7 @@ from agents.extractor_agent import ExtractorAgent
 from agents.analyzer_agent import AnalyzerAgent
 from agents.matcher_agent import MatcherAgent
 from agents.candidate_advisor_agent import CandidateAdvisorAgent
+from agents.profile_enhancer_agent import ProfileEnhancerAgent
 
 # Config
 from config import Config
