@@ -26,9 +26,9 @@
                 </div>
                 <div class="flex items-center space-x-4">
                     <span class="text-sm text-slate-400">Nebius AI Active</span>
-                    <button
-                        class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium transition-all">
-                        Settings
+                    <button id="settingsBtn"
+                        class="bg-slate-800 hover:bg-slate-700 border border-white/10 px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center">
+                        <i data-lucide="settings" class="h-4 w-4 mr-2 text-slate-400"></i> Settings
                     </button>
                     <a href="/" class="text-slate-400 hover:text-white text-sm">Switch to Candidate View</a>
                 </div>
@@ -248,15 +248,49 @@
                 </div>
 
                 <div class="px-6 py-4 bg-white/5 border-t border-white/10 flex justify-end space-x-3">
-                    <button type="button"
-                        class="bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                        onclick="closeModal()">
-                        Reject
+                    <button onclick="contactCandidate()"
+                        class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center">
+                        <i data-lucide="mail" class="h-4 w-4 mr-2"></i> Contact Candidate
                     </button>
-                    <button type="button"
-                        class="bg-green-500/20 text-green-400 border border-green-500/50 hover:bg-green-500/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                        onclick="contactCandidate()">
-                        Contact Candidate
+                    <button onclick="closeModal()"
+                        class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm font-bold">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 z-[60] hidden overflow-y-auto">
+        <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity" onclick="closeSettings()"></div>
+        <div class="flex items-center justify-center min-h-screen p-4 text-center">
+            <div
+                class="glass-card w-full max-w-md bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden text-left relative z-10 animate-in fade-in zoom-in duration-300">
+                <div class="px-6 py-4 border-b border-white/10 flex justify-between items-center bg-white/5">
+                    <h3 class="text-xl font-bold flex items-center">
+                        <i data-lucide="settings" class="h-5 w-5 mr-2 text-blue-400"></i> Dashboard Settings
+                    </h3>
+                    <button onclick="closeSettings()" class="text-slate-400 hover:text-white transition-colors">
+                        <i data-lucide="x" class="h-5 w-5"></i>
+                    </button>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Nebius AI API Key</label>
+                        <input type="password" id="nebiusKeyInput" placeholder="Enter your api key"
+                            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono text-sm">
+                        <p class="text-[10px] text-slate-500 mt-2 italic flex items-start">
+                            <i data-lucide="info" class="h-3 w-3 mr-1 mt-0.5 shrink-0"></i>
+                            This key is stored locally in your browser and used to process resumes via Nebius AI. If
+                            empty, it will use the default system configuration.
+                        </p>
+                    </div>
+                </div>
+                <div class="px-6 py-4 bg-white/5 border-t border-white/10 flex justify-end space-x-3">
+                    <button onclick="saveSettings()"
+                        class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center">
+                        <i data-lucide="save" class="h-4 w-4 mr-2"></i> Save Settings
                     </button>
                 </div>
             </div>
@@ -303,59 +337,29 @@
             renderFileList();
         };
 
-        // Process Upload
-        processBtn.addEventListener('click', async () => {
-            if (selectedFiles.length === 0) return;
-
-            const formData = new FormData();
-            selectedFiles.forEach(file => {
-                formData.append('files', file);
-            });
-
+        // Sync resumes
+        document.getElementById('syncBtn').addEventListener('click', async () => {
+            const syncBtn = document.getElementById('syncBtn');
+            syncBtn.disabled = true;
             document.getElementById('loader').classList.remove('hidden');
-            processBtn.disabled = true;
 
             try {
-                const response = await fetch('/api/recruiter/upload', {
+                const nebiusKey = localStorage.getItem('nebius_api_key');
+                const formData = new FormData();
+                if (nebiusKey) formData.append('nebius_key', nebiusKey);
+
+                const response = await fetch('/api/recruiter/sync_resumes', {
                     method: 'POST',
                     body: formData
                 });
                 const data = await response.json();
 
-                // Store results globally for modal access
-                processedCandidates = [...processedCandidates, ...data.results];
-                renderResults(processedCandidates);
-
-                selectedFiles = []; // clear
-                renderFileList();
-
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Processing failed.');
-            } finally {
-                document.getElementById('loader').classList.add('hidden');
-                processBtn.disabled = false;
-            }
-        });
-
-        // Sync Folder
-        document.getElementById('syncBtn').addEventListener('click', async () => {
-            document.getElementById('loader').classList.remove('hidden');
-            syncBtn.disabled = true;
-
-            try {
-                const response = await fetch('/api/recruiter/sync_resumes', {
-                    method: 'POST'
-                });
-                const data = await response.json();
-
-                if (data.results && data.results.length > 0) {
-                    // Filter out failures if desired or show all
-                    processedCandidates = [...processedCandidates, ...data.results];
+                if (data.status === 'success') {
+                    const newCandidates = data.results.filter(r => r.status !== 'Failed');
+                    processedCandidates = [...processedCandidates, ...newCandidates];
                     renderResults(processedCandidates);
                     updateCandidateStats();
-                } else {
-                    alert(data.message || "No new resumes found in folder.");
+                    alert(`Sync complete! Processed ${newCandidates.length} new resumes.`);
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -363,6 +367,46 @@
             } finally {
                 document.getElementById('loader').classList.add('hidden');
                 syncBtn.disabled = false;
+            }
+        });
+
+        // Batch upload
+        document.getElementById('processBtn').addEventListener('click', async () => {
+            const files = selectedFiles; // Use selectedFiles from drag/drop or file input
+            if (files.length === 0) return alert('Select files first');
+
+            document.getElementById('loader').classList.remove('hidden');
+            const processBtn = document.getElementById('processBtn');
+            processBtn.disabled = true;
+
+            try {
+                const nebiusKey = localStorage.getItem('nebius_api_key');
+                const formData = new FormData();
+                for (let i = 0; i < files.length; i++) {
+                    formData.append('files', files[i]);
+                }
+                if (nebiusKey) formData.append('nebius_key', nebiusKey);
+
+                const response = await fetch('/api/recruiter/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                const newCandidates = data.results.filter(r => r.status !== 'Failed');
+                processedCandidates = [...processedCandidates, ...newCandidates];
+                renderResults(processedCandidates);
+                updateCandidateStats();
+
+                selectedFiles = []; // Clear selected files after processing
+                renderFileList(); // Update UI
+                alert(`Processed ${newCandidates.length} files successfully!`);
+            } catch (error) {
+                console.error('Upload error:', error);
+                alert('Analysis failed.');
+            } finally {
+                document.getElementById('loader').classList.add('hidden');
+                processBtn.disabled = false;
             }
         });
 
@@ -523,8 +567,51 @@
         // Call fetch on load
         document.addEventListener('DOMContentLoaded', loadCandidates);
 
+        // Settings logic
+        document.getElementById('settingsBtn').addEventListener('click', () => {
+            const key = localStorage.getItem('nebius_api_key') || '';
+            document.getElementById('nebiusKeyInput').value = key;
+            document.getElementById('settingsModal').classList.remove('hidden');
+        });
+
+        window.closeSettings = () => {
+            document.getElementById('settingsModal').classList.add('hidden');
+        };
+
+        window.saveSettings = () => {
+            const key = document.getElementById('nebiusKeyInput').value.trim();
+            if (key) {
+                localStorage.setItem('nebius_api_key', key);
+                // This selector might need to be more specific if there are other similar elements
+                // For now, assuming it targets a status indicator for Nebius AI
+                const nebiusStatusElement = document.querySelector('.text-sm.text-slate-400');
+                if (nebiusStatusElement) {
+                    nebiusStatusElement.innerText = 'Nebius AI Active (Custom Key)';
+                }
+            } else {
+                localStorage.removeItem('nebius_api_key');
+                const nebiusStatusElement = document.querySelector('.text-sm.text-slate-400');
+                if (nebiusStatusElement) {
+                    nebiusStatusElement.innerText = 'Nebius AI Active';
+                }
+            }
+            closeSettings();
+            alert('Settings saved!');
+        };
+
+        // Initialize status on load
+        window.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('nebius_api_key')) {
+                // This selector might need to be more specific if there are other similar elements
+                const nebiusStatusElement = document.querySelector('.text-sm.text-slate-400');
+                if (nebiusStatusElement) {
+                    nebiusStatusElement.innerText = 'Nebius AI Active (Custom Key)';
+                }
+            }
+        });
+
+        lucide.createIcons();
     </script>
 </body>
 
 </html>
-```

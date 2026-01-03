@@ -30,19 +30,43 @@ class ExtractorAgent(BaseAgent):
         else:
             raw_text = resume_data.get("text", "")
 
-        # Get structured information from Ollama
+        # Get structured information
         extraction_prompt = f"""
-        Extract the following information from the resume text into a VALID JSON format:
-        1. Personal Info (Name, Email, Phone, Location)
-        2. Work Experience (Company, Role, Duration, Responsibilities/Projects)
-        3. Education (Institution, Degree, Field, Year)
-        4. Technical Skills (As a list)
-        5. Certifications
+        Extract the resume text into a STRICT JSON format.
         
         Resume Text:
         {raw_text[:4000]}
         
-        Return ONLY valid JSON.
+        OUTPUT SCHEMA:
+        {{
+            "personal_info": {{
+                "name": "full name",
+                "email": "email address",
+                "phone": "phone number",
+                "location": "city, country"
+            }},
+            "education": [
+                {{
+                    "institution": "University/School",
+                    "level": "Degree level (e.g. Bachelor's, Master's)",
+                    "field": "Field of study (e.g. Computer Science)",
+                    "year": "Graduation year"
+                }}
+            ],
+            "experience": [
+                {{
+                    "company": "Company Name",
+                    "role": "Job Title",
+                    "duration": "Dates of employment",
+                    "responsibilities": ["bullet points"]
+                }}
+            ],
+            "technical_skills": ["List of skills"],
+            "certifications": ["List of certifications"]
+        }}
+        
+        CRITICAL: For Education, separate "level" (e.g. B.Sc) and "field" (e.g. Engineering).
+        RETURN ONLY VALID JSON.
         """
 
         extracted_info = self._query_llm(extraction_prompt)

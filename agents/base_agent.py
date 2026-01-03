@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from typing import Dict, Any, Optional
 from openai import OpenAI
 from config import Config
@@ -65,11 +66,25 @@ class BaseAgent:
 
     def _parse_json_safely(self, text: str) -> Dict[str, Any]:
         """
-        Safely parse JSON from LLM response.
+        Safely parse JSON from LLM response, attempting to find JSON blocks within text.
         """
         try:
-            # Remove any markdown code block indicators
-            clean_text = text.replace("```json", "").replace("```", "").strip()
-            return json.loads(clean_text)
+            # 1. Try direct parsing first
+            return json.loads(text)
         except json.JSONDecodeError:
-            return {"error": "Failed to parse JSON", "raw_text": text}
+            try:
+                # 2. Try cleaning markdown indicators
+                clean_text = text.replace("```json", "").replace("```", "").strip()
+                return json.loads(clean_text)
+            except json.JSONDecodeError:
+                # 3. Use regex to find the FIRST JSON object or array block
+                # Search for something starting with { and ending with }
+                match = re.search(r"(\{.*\}|\[.*\])", text, re.DOTALL)
+                if match:
+                    try:
+                        return json.loads(match.group(1))
+                    except json.JSONDecodeError:
+                        pass
+                
+                logger.warning(f"[{self.name}] Failed to parse JSON from: {text[:200]}...")
+                return {"error": "Failed to parse JSON", "raw_text": text}

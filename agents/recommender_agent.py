@@ -41,17 +41,20 @@ class RecommenderAgent(BaseAgent):
         }
 
         prompt = f"""
+        ACT AS A SENIOR HR DIRECTOR.
         Provide a final hiring recommendation based on the candidate summary below.
         
         Candidate Data: {json.dumps(focused_context, indent=2)}
         
-        Return a STRICT JSON object with these keys:
+        REQUIRED OUTPUT FORMAT (STRICT JSON):
         {{
-            "hiring_status": "Recommended" or "Not Recommended" or "Pending Review",
-            "recommendation": "Detailed justification for the verdict (2-3 sentences)",
-            "next_steps": ["step1", "step2"],
-            "confidence_level": "Low/Medium/High"
+            "hiring_status": "Recommended" | "Not Recommended" | "Pending Review",
+            "recommendation": "Professional 2-3 sentence justification. Focus on why they fit or don't fit based on skills and screening score.",
+            "next_steps": ["Specific actionable next step 1", "Specific actionable next step 2"],
+            "confidence_level": "Low" | "Medium" | "High"
         }}
+        
+        DO NOT include any explanation outside the JSON block.
         """
 
         response = self._query_llm(prompt)

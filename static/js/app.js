@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileNameDisplay = document.getElementById('fileName');
     const resultsArea = document.getElementById('resultsArea');
     const submitBtn = form.querySelector('button[type="submit"]');
-    
+
     // File Input Handler
     fileInput.addEventListener('change', (e) => {
         if (e.target.files.length > 0) {
@@ -16,21 +16,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Form Submit Handler
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         // UI Loading State
         setLoading(true);
         resultsArea.classList.add('hidden');
-        
+
         const formData = new FormData(form);
-        
+
         try {
-            const response = await fetch('/api/analyze', {
+            const response = await fetch('/api/candidate/analyze', {
                 method: 'POST',
                 body: formData
             });
-            
+
             const data = await response.json();
-            
+
             if (data.status === 'success') {
                 renderResults(data);
                 resultsArea.classList.remove('hidden');
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 alert('Analysis failed: ' + (data.error || 'Unknown error'));
             }
-            
+
         } catch (error) {
             console.error('Error:', error);
             alert('An error occurred. Please try again.');
@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnText = document.getElementById('btnText');
         const btnIcon = document.getElementById('btnIcon');
         const btnSpinner = document.getElementById('btnSpinner');
-        
+
         if (isLoading) {
             btnText.textContent = 'Analyzing...';
             btnIcon.classList.add('hidden');
