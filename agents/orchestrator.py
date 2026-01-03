@@ -9,23 +9,27 @@ from .profile_enhancer_agent import ProfileEnhancerAgent
 
 
 class OrchestratorAgent(BaseAgent):
-    def __init__(self):
+    def __init__(self, provider: str = None, api_key: str = None):
         super().__init__(
             name="Orchestrator",
             instructions="""Coordinate the recruitment workflow and delegate tasks to specialized agents.
             Ensure proper flow of information between extraction, analysis, matching, screening, and recommendation phases.
             Maintain context and aggregate results from each stage.""",
+            provider=provider,
+            api_key=api_key
         )
+        self.provider = provider
+        self.api_key = api_key
         self._setup_agents()
 
     def _setup_agents(self):
         """Initialize all specialized agents"""
-        self.extractor = ExtractorAgent()
-        self.enhancer = ProfileEnhancerAgent()
-        self.analyzer = AnalyzerAgent()
-        self.matcher = MatcherAgent()
-        self.screener = ScreenerAgent()
-        self.recommender = RecommenderAgent()
+        self.extractor = ExtractorAgent(provider=self.provider, api_key=self.api_key)
+        self.enhancer = ProfileEnhancerAgent(provider=self.provider, api_key=self.api_key)
+        self.analyzer = AnalyzerAgent(provider=self.provider, api_key=self.api_key)
+        self.matcher = MatcherAgent(provider=self.provider, api_key=self.api_key)
+        self.screener = ScreenerAgent(provider=self.provider, api_key=self.api_key)
+        self.recommender = RecommenderAgent(provider=self.provider, api_key=self.api_key)
 
     async def run(self, messages: list) -> Dict[str, Any]:
         """Process a single message through the agent"""

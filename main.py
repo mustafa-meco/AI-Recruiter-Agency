@@ -129,7 +129,7 @@ async def get_candidates():
         return {"status": "error", "message": str(e)}
 
 @app.post("/api/recruiter/sync_resumes")
-async def sync_local_resumes():
+async def sync_local_resumes(nebius_key: Optional[str] = Form(None)):
     """
     Scans the 'resumes/' folder and processes any new PDF files found there.
     """
@@ -141,7 +141,10 @@ async def sync_local_resumes():
         return {"status": "success", "message": "No resumes found in folder.", "results": []}
 
     results = []
-    orchestrator = OrchestratorAgent()
+    # Determine Provider
+    provider = "nebius" if nebius_key else Config.DEFAULT_PROVIDER
+    orchestrator = OrchestratorAgent(provider=provider, api_key=nebius_key)
+    
     db = JobDatabase()
     for file_path in files:
         try:
@@ -213,13 +216,17 @@ async def sync_local_resumes():
 
 @app.post("/api/recruiter/upload")
 async def batch_upload_resumes(
-    files: List[UploadFile] = File(...)
+    files: List[UploadFile] = File(...),
+    nebius_key: Optional[str] = Form(None)
 ):
     """
     Handle bulk upload for recruiter.
     """
     results = []
-    orchestrator = OrchestratorAgent()
+    # Determine Provider
+    provider = "nebius" if nebius_key else Config.DEFAULT_PROVIDER
+    orchestrator = OrchestratorAgent(provider=provider, api_key=nebius_key)
+    
     db = JobDatabase()
     
     for file in files:
