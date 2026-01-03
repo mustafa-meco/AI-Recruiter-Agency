@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Candidate Portal</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body class="bg-slate-900 text-white min-h-screen font-sans antialiased">
+
+    <!-- Background Decoration -->
+    <div class="fixed inset-0 pointer-events-none">
+        <div
+            class="absolute top-0 left-0 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob">
+        </div>
+        <div
+            class="absolute top-0 right-0 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000">
+        </div>
+        <div
+            class="absolute -bottom-8 left-20 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000">
+        </div>
+    </div>
+
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <!-- Header -->
+        <div class="text-center mb-16">
+            <h1
+                class="text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+                AI Career Architect
+            </h1>
+            <p class="text-slate-400 text-lg max-w-2xl mx-auto">
+                Upload your resume to get instant, AI-powered analysis, real-time job matches, and personalized career
+                advice.
+            </p>
+        </div>
+
+        <!-- Main Input Section -->
+        <div class="max-w-xl mx-auto mb-16 relative group">
+            <div
+                class="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200">
+            </div>
+            <div class="relative bg-slate-800 rounded-2xl p-8 shadow-2xl border border-slate-700">
+                <form id="uploadForm" class="space-y-6">
+
+                    <!-- File Drop Zone -->
+                    <div class="flex items-center justify-center w-full">
+                        <label for="dropzone-file"
+                            class="flex flex-col items-center justify-center w-full h-48 border-2 border-slate-600 border-dashed rounded-xl cursor-pointer bg-slate-800/50 hover:bg-slate-700/50 transition-colors">
+                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                <i class="fa-solid fa-cloud-arrow-up text-4xl text-blue-500 mb-4"></i>
+                                <p class="mb-2 text-sm text-slate-300"><span class="font-semibold">Click to
+                                        upload</span> or drag and drop</p>
+                                <p class="text-xs text-slate-500">PDF, DOCX (Max 10MB)</p>
+                                <p id="fileName" class="mt-2 text-sm text-blue-400 font-medium hidden"></p>
+                            </div>
+                            <input id="dropzone-file" name="file" type="file" class="hidden" accept=".pdf" required />
+                        </label>
+                    </div>
+
+                    <!-- API Key Input -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-2">
+                            Nebius API Key <a href="https://tokenfactory.nebius.com/"
+                                class="text-blue-400 hover:text-blue-300 transition-colors ml-1">(Link)</a>
+                        </label>
+                        <input type="password" id="nebiusKey" name="nebius_key"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-600"
+                            placeholder="sk-..." required>
+                    </div>
+
+                    <button type="submit"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center gap-2">
+                        <span id="btnText">Analyze Profile</span>
+                        <i id="btnIcon" class="fa-solid fa-bolt"></i>
+                        <i id="btnSpinner" class="fa-solid fa-circle-notch fa-spin hidden"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Results Section (Hidden initially) -->
+        <div id="resultsArea" class="hidden space-y-12">
+
+            <!-- Analysis Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Profile Summary -->
+                <div class="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-8 border border-slate-700/50">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                        <i class="fa-solid fa-user-astronaut text-purple-400"></i> Profile Analysis
+                    </h2>
+                    <div id="profileStats" class="grid grid-cols-2 gap-4 mb-6">
+                        <!-- Filled by JS -->
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Top Skills</h3>
+                        <div id="skillTags" class="flex flex-wrap gap-2">
+                            <!-- Tags filled by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Career Advice -->
+                <div class="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-8 border border-slate-700/50">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                        <i class="fa-solid fa-lightbulb text-yellow-400"></i> AI Career Advisor
+                    </h2>
+                    <div id="adviceContent" class="space-y-4 text-slate-300">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Job Matches -->
+            <div class="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-8 border border-slate-700/50">
+                <h2 class="text-2xl font-bold mb-8 flex items-center gap-3">
+                    <i class="fa-solid fa-briefcase text-blue-400"></i> Live Job Matches
+                </h2>
+                <div id="jobsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Cards filled by JS -->
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+
+</html>

@@ -1,22 +1,40 @@
 from typing import Dict, Any
-from swarm import Agent
+from .base_agent import BaseAgent
+import logging
 
+logger = logging.getLogger(__name__)
 
-# Profile Enhancer agent: Enhances the candidate' profile
-def profile_enhancer_agent_function(extracted_info: Dict[str, Any]) -> Dict[str, Any]:
-    enhanced_profile = extracted_info.copy()
-    total_experience_years = sum(item["years"] for item in extracted_info.get("experience", []))
-    enhanced_profile["summary"] = (
-        f"{extracted_info['name']} has {total_experience_years} years of experience in {extracted_info['skills']}"
-    )
+class ProfileEnhancerAgent(BaseAgent):
+    def __init__(self, provider: str = None, api_key: str = None):
+        super().__init__(
+            name="ProfileEnhancer",
+            instructions="""You are a Professional Profile Optimizer.
+            Your goal is to take extracted resume data and polish it into a coherent, professional summary.
+            Fix grammatical errors, standardize job titles, and summarize key strengths.
+            
+            Return ONLY a JSON object with:
+            {
+                "enhanced_summary": "polished professional summary",
+                "standardized_skills": ["Skill 1", "Skill 2"],
+                "total_years_exp": 0
+            }
+            """,
+            provider=provider,
+            api_key=api_key
+        )
 
-    return enhanced_profile
-
-profile_enhancer_agent = Agent(
-    name="Profile Enhancer Agent",
-    model="llama3.2",
-    instructions="""
-    Enhance the candidate's profile based on the extracted information.
-    """,
-    functions=[profile_enhancer_agent_function]
-)
+    async def run(self, messages: list) -> Dict[str, Any]:
+        """Enhance and clean up the candidate profile"""
+        print("✨ ProfileEnhancer: Polishing candidate profile")
+        
+        content = messages[-1].get("content", "{}")
+        
+        prompt = f"""
+        Enhance and standardize this candidate data:
+        {str(content)}
+        
+        Ensure output is valid JSON.
+        """
+        
+        response = self._query_llm(prompt)
+        return self._parse_json_safely(response)

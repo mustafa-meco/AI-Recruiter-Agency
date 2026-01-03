@@ -1,10 +1,11 @@
 from typing import Dict, Any
 from .base_agent import BaseAgent
 from .extractor_agent import ExtractorAgent
-from .screener_agent import ScreenerAgent
 from .analyzer_agent import AnalyzerAgent
 from .matcher_agent import MatcherAgent
+from .screener_agent import ScreenerAgent
 from .recommender_agent import RecommenderAgent
+from .profile_enhancer_agent import ProfileEnhancerAgent
 
 
 class OrchestratorAgent(BaseAgent):
@@ -13,28 +14,28 @@ class OrchestratorAgent(BaseAgent):
             name="Orchestrator",
             instructions="""Coordinate the recruitment workflow and delegate tasks to specialized agents.
             Ensure proper flow of information between extraction, analysis, matching, screening, and recommendation phases.
-            Maintain context and aggregate results from each stage."""
+            Maintain context and aggregate results from each stage.""",
         )
-
         self._setup_agents()
 
     def _setup_agents(self):
+        """Initialize all specialized agents"""
         self.extractor = ExtractorAgent()
-        self.screener = ScreenerAgent()
+        self.enhancer = ProfileEnhancerAgent()
         self.analyzer = AnalyzerAgent()
         self.matcher = MatcherAgent()
+        self.screener = ScreenerAgent()
         self.recommender = RecommenderAgent()
-    
+
     async def run(self, messages: list) -> Dict[str, Any]:
         """Process a single message through the agent"""
-        prompt = messages[-1]['content']
+        prompt = messages[-1]["content"]
         response = self._query_ollama(prompt)
-        parsed_response = self._parse_json_safely(response)
-        return parsed_response
+        return self._parse_json_safely(response)
 
     async def process_application(self, resume_data: Dict[str, Any]) -> Dict[str, Any]:
         """Main workflow orchestrator for processing job applications"""
-        print(" Orchestrator: Starting application processing")
+        print("🎯 Orchestrator: Starting application process")
 
         workflow_context = {
             "resume_data": resume_data,
@@ -44,21 +45,27 @@ class OrchestratorAgent(BaseAgent):
 
         try:
             # Extract resume information
-            extracted_data = await self.extractor.run(
+            extraction_res = await self.extractor.run(
                 [{"role": "user", "content": str(resume_data)}]
             )
-            workflow_context.update(
-                {"extracted_data": extracted_data, "current_stage": "analysis"}
+            
+            # Step B: Profile Enhancement
+            enhanced_data = await self.enhancer.run(
+                [{"content": str(extraction_res.get("structured_data", ""))}]
             )
 
             # Analyze candidate profile
+            analysis_input = {
+                "raw_text": extraction_res.get("raw_text", ""),
+                "enhanced_data": enhanced_data,
+                "structured_data": extraction_res.get("structured_data", "")
+            }
             analysis_results = await self.analyzer.run(
-                [{"role": "user", "content": str(workflow_context)}]
+                [{"role": "user", "content": str(analysis_input)}]
             )
             workflow_context.update(
                 {"analysis_results": analysis_results, "current_stage": "matching"}
             )
-            
 
             # Match with jobs
             job_matches = await self.matcher.run(
@@ -73,15 +80,18 @@ class OrchestratorAgent(BaseAgent):
                 [{"role": "user", "content": str(workflow_context)}]
             )
             workflow_context.update(
-                {"screening_results": screening_results, "current_stage": "recommendation"}
+                {
+                    "screening_results": screening_results,
+                    "current_stage": "recommendation",
+                }
             )
 
             # Generate recommendations
-            recommendations = await self.recommender.run(
+            final_recommendation = await self.recommender.run(
                 [{"role": "user", "content": str(workflow_context)}]
             )
             workflow_context.update(
-                {"recommendations": recommendations, "status": "completed"}
+                {"final_recommendation": final_recommendation, "status": "completed"}
             )
 
             return workflow_context
