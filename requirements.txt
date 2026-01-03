@@ -1,3 +1,11 @@
 streamlit
 pdfminer.six
 openai
+streamlit-option-menu>=0.3.6
+swarm>=0.1.0
+duckduckgo-search>=5.0.0
+fastapi
+uvicorn
+python-multipart
+jinja2
+aiofiles

@@ -1,9 +1,21 @@
 import asyncio
 import json
 from agents.orchestrator import OrchestratorAgent
+from db.database import JobDatabase
+from db.seed_jobs import seed_jobs
 
 async def test_workflow():
     print("Starting Workflow Test...")
+    
+    # Ensure DB is seeded
+    print("Checking database...")
+    db = JobDatabase()
+    if not db.get_all_jobs():
+        print("Database empty. Seeding initial jobs...")
+        seed_jobs()
+    else:
+        print(f"Database contains {len(db.get_all_jobs())} jobs.")
+
     orchestrator = OrchestratorAgent()
     
     # Mock resume data
