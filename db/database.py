@@ -22,7 +22,17 @@ class JobDatabase:
             schema = f.read()
 
         with sqlite3.connect(self.db_path) as conn:
+            # Simple migration: Try to create tables if they don't exist
+            # This works because our schema uses IF NOT EXISTS
             conn.executescript(schema)
+            
+            # Check if candidates table exists (double check for older sqlite setups)
+            try:
+                conn.execute("SELECT count(*) FROM candidates")
+            except sqlite3.OperationalError:
+                # If table doesn't exist despite schema execution (rare), force it or migrate
+                print("Migrating database: Creating candidates table...")
+                conn.executescript(schema)
 
     def add_job(self, job_data: Dict[str, Any]) -> int:
         """Add a new job to the database"""
@@ -124,6 +134,63 @@ class JobDatabase:
         except Exception as e:
             print(f"Error searching jobs: {e}")
             return []
+
+    def add_candidate(self, candidate_data: Dict[str, Any]) -> int:
+        """Add a new candidate to the database"""
+        query = """
+        INSERT INTO candidates (
+            filename, name, email, phone, score,
+            recommendation, full_report, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                query,
+                (
+                    candidate_data["filename"],
+                    candidate_data.get("name"),
+                    candidate_data.get("email"),
+                    candidate_data.get("phone"),
+                    candidate_data.get("score", 0),
+                    candidate_data.get("recommendation"),
+                    json.dumps(candidate_data.get("full_report", {})),
+                    candidate_data.get("status", "Analyzed")
+                )
+            )
+            return cursor.lastrowid
+
+    def get_all_candidates(self) -> List[Dict[str, Any]]:
+        """Retrieve all candidates from the database"""
+        query = "SELECT * FROM candidates ORDER BY created_at DESC"
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            
+            results = []
+            for row in rows:
+                try:
+                   report = json.loads(row["full_report"])
+                except:
+                   report = {}
+                   
+                results.append({
+                    "id": row["id"],
+                    "filename": row["filename"],
+                    "name": row["name"],
+                    "email": row["email"],
+                    "phone": row["phone"],
+                    "score": row["score"],
+                    "recommendation": row["recommendation"],
+                    "full_report": report,
+                    "status": row["status"],
+                    "created_at": row["created_at"]
+                })
+            return results
 
 
 # import sqlite3
