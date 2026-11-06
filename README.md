@@ -6,7 +6,7 @@ The only resume in this repository, `resumes/sample_resume.pdf`, is made up. Kee
 
 ## Origin
 
-This began as an exercise from an Ollama course. I extended it with the FastAPI backend, the two dashboards, more agents and the SQLite candidate store.
+This began as the final project of [Ollama Course: Build AI Apps Locally](https://www.youtube.com/watch?v=GWB9ApTPTv4) on the freeCodeCamp YouTube channel. I extended it with the FastAPI backend, the two dashboards, more agents and the SQLite candidate store.
 
 ## 🌟 Key Features
 
