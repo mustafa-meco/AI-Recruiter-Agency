@@ -1,7 +1,7 @@
 import sqlite3
 import json
 
-db_path = "e:/ollama workspace/Ollama_Course/AI Recruiter Agency/db/jobs.sqlite"
+db_path = "db/jobs.sqlite"
 
 try:
     conn = sqlite3.connect(db_path)

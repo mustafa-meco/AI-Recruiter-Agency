@@ -1,6 +1,12 @@
 # AI Recruiter Agency 🤖💼
 
-An enterprise-grade AI-powered recruitment automation system featuring dual dashboards, intelligent agent orchestration, and persistent candidate management. Built with FastAPI, modern web technologies, and advanced LLM capabilities.
+An AI recruitment pipeline with a candidate portal and a recruiter dashboard. Eight agents extract, enhance, analyse, match and screen resumes, using a local Ollama model or Nebius AI. Built with FastAPI and SQLite.
+
+The only resume in this repository, `resumes/sample_resume.pdf`, is made up. Keep real resumes in your local copy only: `resumes/` and `uploads/` are ignored by git.
+
+## Origin
+
+This began as an exercise from an Ollama course. I extended it with the FastAPI backend, the two dashboards, more agents and the SQLite candidate store.
 
 ## 🌟 Key Features
 
@@ -20,7 +26,7 @@ An enterprise-grade AI-powered recruitment automation system featuring dual dash
 - **Market Intelligence**: Real-time job market analysis and trend detection
 - **Multi-Source Results**: Database jobs + live market opportunities with source attribution
 
-### **Enterprise Features**
+### **Candidate Records**
 - **Persistent Storage**: SQLite database for candidates and job listings
 - **Duplicate Detection**: Intelligent file-based deduplication
 - **Bulk Processing**: Sync entire resume folders with one click
@@ -159,8 +165,8 @@ graph LR
    ```
 
 4. **Configure LLM Provider** (Optional):
-   - Edit `config.py` to set your preferred provider and model
-   - For Nebius AI, set your API key in `config.py`
+   - Run `cp .env.example .env`
+   - Ollama is the default and needs no key. For Nebius AI, set `LLM_PROVIDER=nebius` and `NEBIUS_API_KEY` in `.env`
 
 ### Running the Application
 
@@ -272,7 +278,7 @@ OLLAMA_BASE_URL = "http://localhost:11434"
 OLLAMA_MODEL = "llama3.2"
 
 # Nebius settings
-NEBIUS_API_KEY = "your-api-key-here"
+NEBIUS_API_KEY = os.getenv("NEBIUS_API_KEY", "")  # set it in .env
 NEBIUS_MODEL = "google/gemma-2-2b-it"
 ```
 
