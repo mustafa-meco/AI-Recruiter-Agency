@@ -1,0 +1,565 @@
+{
+    "name": "AI Recruiter - LLM Chain Multi-Stage Pipeline",
+    "nodes": [
+        {
+            "parameters": {
+                "content": "## ⛓️ LLM Chain Recruitment Pipeline\n\nEach stage uses a **Basic LLM Chain** node (AI node, not an Agent).\nEach chain has a **Chat Model** sub-node connected below it.\n\n**Stages on canvas:**\n① Extract → ② Enhance → ③ Analyze → ④ Market Intel → ⑤ Screen → ⑥ Recommend\n\n**Setup:**\n- Create **OpenAI API** credential (type) with Nebius key\n  and base URL `https://api.studio.nebius.ai/v1/`\n- Assign it to each Chat Model node",
+                "height": 300,
+                "width": 450,
+                "color": 3
+            },
+            "id": "sticky-overview",
+            "name": "Overview",
+            "type": "n8n-nodes-base.stickyNote",
+            "typeVersion": 1,
+            "position": [
+                0,
+                -80
+            ]
+        },
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "llm-chain-pipeline",
+                "responseMode": "responseNode"
+            },
+            "id": "webhook",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                240,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const body = $input.first().json;\nif (!body.resume_text) throw new Error('resume_text is required');\nconst rawText = body.resume_text.substring(0, 4000);\nreturn [{ json: {\n  resume_text: body.resume_text,\n  candidate_id: body.candidate_id || `cand_${Date.now()}`,\n  prompt: `You are a professional Resume Extractor. Extract all information from the resume below and return ONLY valid JSON — no explanations, no markdown blocks, just raw JSON.\\n\\nRequired JSON schema:\\n{\\\"personal_info\\\":{\\\"name\\\":\\\"\\\",\\\"email\\\":\\\"\\\",\\\"phone\\\":\\\"\\\",\\\"location\\\":\\\"\\\"},\\\"education\\\":[{\\\"institution\\\":\\\"\\\",\\\"level\\\":\\\"\\\",\\\"field\\\":\\\"\\\",\\\"year\\\":\\\"\\\"}],\\\"experience\\\":[{\\\"company\\\":\\\"\\\",\\\"role\\\":\\\"\\\",\\\"duration\\\":\\\"\\\",\\\"responsibilities\\\":[]}],\\\"technical_skills\\\":[],\\\"certifications\\\":[]}\\n\\nResume Text:\\n${rawText}`\n} }];"
+            },
+            "id": "setup",
+            "name": "Setup Input",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                460,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "prompt": "={{ $json.prompt }}"
+            },
+            "id": "chain-extractor",
+            "name": "① Extract Chain",
+            "type": "@n8n/n8n-nodes-langchain.chainLlm",
+            "typeVersion": 1.4,
+            "position": [
+                700,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "google/gemma-2-9b-it-fast",
+                "options": {}
+            },
+            "id": "model-extractor",
+            "name": "Chat Model: Extract",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1.2,
+            "position": [
+                700,
+                500
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "nebius-creds",
+                    "name": "Nebius AI (OpenAI Compatible)"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const chainText = $input.first().json.text || '';\nconst prev = $node['Setup Input'].json;\nlet extracted = {};\ntry {\n  const cleaned = chainText.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  extracted = JSON.parse(m ? m[1] : cleaned);\n} catch(e) { extracted = { error: 'parse_failed' }; }\nreturn [{ json: {\n  ...prev,\n  extraction_results: { structured_data: extracted, status: extracted.error ? 'partial' : 'completed' },\n  prompt: `You are a Professional Profile Optimizer. Polish and standardize the extracted resume data below. Fix errors, standardize job titles, and calculate total years of experience. Return ONLY valid JSON — no markdown.\\n\\n{\\\"enhanced_summary\\\":\\\"\\\",\\\"standardized_skills\\\":[],\\\"total_years_exp\\\":0}\\n\\nInput data:\\n${JSON.stringify(extracted)}`\n} }];"
+            },
+            "id": "parse1",
+            "name": "Parse ① → Prep ②",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                940,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "prompt": "={{ $json.prompt }}"
+            },
+            "id": "chain-enhancer",
+            "name": "② Enhance Chain",
+            "type": "@n8n/n8n-nodes-langchain.chainLlm",
+            "typeVersion": 1.4,
+            "position": [
+                1180,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "google/gemma-2-9b-it-fast",
+                "options": {}
+            },
+            "id": "model-enhancer",
+            "name": "Chat Model: Enhance",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1.2,
+            "position": [
+                1180,
+                500
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "nebius-creds",
+                    "name": "Nebius AI (OpenAI Compatible)"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const chainText = $input.first().json.text || '';\nconst prev = $node['Parse ① → Prep ②'].json;\nlet enhanced = {};\ntry {\n  const cleaned = chainText.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  enhanced = JSON.parse(m ? m[1] : cleaned);\n} catch(e) { enhanced = {}; }\nconst rawText = (prev.resume_text || '').substring(0,2000);\nreturn [{ json: {\n  ...prev,\n  enhanced_data: enhanced,\n  prompt: `You are a Skills Analyst. Analyze this candidate and classify their seniority. Rules: Junior < 3 years, Mid-level 3-7 years, Senior > 7 years. Return ONLY valid JSON — no markdown.\\n\\n{\\\"technical_skills\\\":[],\\\"years_of_experience\\\":0,\\\"education\\\":{\\\"level\\\":\\\"\\\",\\\"field\\\":\\\"\\\"},\\\"experience_level\\\":\\\"Junior|Mid-level|Senior\\\",\\\"key_achievements\\\":[],\\\"domain_expertise\\\":[]}\\n\\nRaw resume: ${rawText}\\nStructured data: ${JSON.stringify(prev.extraction_results?.structured_data || {})}\\nEnhanced data: ${JSON.stringify(enhanced)}`\n} }];"
+            },
+            "id": "parse2",
+            "name": "Parse ② → Prep ③",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1420,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "prompt": "={{ $json.prompt }}"
+            },
+            "id": "chain-analyzer",
+            "name": "③ Analyze Chain",
+            "type": "@n8n/n8n-nodes-langchain.chainLlm",
+            "typeVersion": 1.4,
+            "position": [
+                1660,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "google/gemma-2-9b-it-fast",
+                "options": {}
+            },
+            "id": "model-analyzer",
+            "name": "Chat Model: Analyze",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1.2,
+            "position": [
+                1660,
+                500
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "nebius-creds",
+                    "name": "Nebius AI (OpenAI Compatible)"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const chainText = $input.first().json.text || '';\nconst prev = $node['Parse ② → Prep ③'].json;\nlet skills = {};\ntry {\n  const cleaned = chainText.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  skills = JSON.parse(m ? m[1] : cleaned);\n} catch(e) {\n  skills = { technical_skills:[], years_of_experience:0, education:{level:'Unknown',field:'Unknown'}, experience_level:'Junior', key_achievements:[], domain_expertise:[] };\n}\nconst topSkills = (skills.technical_skills || []).slice(0,5).join(', ');\nconst role = `${skills.experience_level || 'Mid-level'} ${(skills.technical_skills||[])[0] || 'Software'} Developer`;\nreturn [{ json: {\n  ...prev,\n  analysis_results: { skills_analysis: skills, analysis_timestamp: new Date().toISOString().split('T')[0], confidence_score: 0.85 },\n  skills_list: skills.technical_skills || [],\n  prompt: `You are a Market Intelligence Expert specializing in tech hiring in 2026. Generate 3 realistic, currently-available job listings for a '${role}' candidate. Their top skills: ${topSkills}. Return ONLY valid JSON — no markdown.\\n\\n{\\\"market_jobs\\\":[{\\\"title\\\":\\\"\\\",\\\"company\\\":\\\"\\\",\\\"location\\\":\\\"\\\",\\\"salary_range\\\":\\\"\\\",\\\"requirements\\\":[],\\\"description\\\":\\\"\\\"}]}`\n} }];"
+            },
+            "id": "parse3",
+            "name": "Parse ③ → Prep ④",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1900,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "prompt": "={{ $json.prompt }}"
+            },
+            "id": "chain-market",
+            "name": "④ Market Intel Chain",
+            "type": "@n8n/n8n-nodes-langchain.chainLlm",
+            "typeVersion": 1.4,
+            "position": [
+                2140,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "google/gemma-2-9b-it-fast",
+                "options": {}
+            },
+            "id": "model-market",
+            "name": "Chat Model: Market",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1.2,
+            "position": [
+                2140,
+                500
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "nebius-creds",
+                    "name": "Nebius AI (OpenAI Compatible)"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const chainText = $input.first().json.text || '';\nconst prev = $node['Parse ③ → Prep ④'].json;\nconst candidateSkillSet = new Set((prev.skills_list || []).map(s => s.toLowerCase()));\nlet liveJobs = [];\ntry {\n  const cleaned = chainText.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  const parsed = JSON.parse(m ? m[1] : cleaned);\n  liveJobs = parsed.market_jobs || [];\n} catch(e) { liveJobs = []; }\nconst scored = liveJobs.map(job => {\n  const reqs = Array.isArray(job.requirements) ? job.requirements : [];\n  const reqSet = new Set(reqs.map(r => r.toLowerCase()));\n  const score = reqSet.size === 0 ? 75 : Math.round(([...reqSet].filter(r => candidateSkillSet.has(r)).length / reqSet.size) * 100);\n  return { title: `${job.title} at ${job.company}`, match_score: score, location: job.location || 'Remote', salary_range: job.salary_range || 'Competitive', requirements: reqs, source: 'Live Market 🌐' };\n}).filter(j => j.match_score >= 30).sort((a,b) => b.match_score - a.match_score);\nconst name = prev.extraction_results?.structured_data?.personal_info?.name || 'Candidate';\nconst ctx = JSON.stringify({ candidate_name: name, skills_analysis: prev.analysis_results.skills_analysis, job_matches: scored.slice(0,3) });\nreturn [{ json: {\n  ...prev,\n  job_matches: { matched_jobs: scored.slice(0,3), match_timestamp: new Date().toISOString().split('T')[0], number_of_matches: scored.length },\n  prompt: `You are a senior HR Screener with 15 years of experience. Evaluate this candidate against the matched job opportunities. Provide a detailed assessment and score (0-100). Return ONLY valid JSON — no markdown.\\n\\n{\\\"screening_report\\\":\\\"3-4 sentence assessment\\\",\\\"screening_score\\\":75,\\\"red_flags\\\":[]}\\n\\nCandidate data:\\n${ctx}`\n} }];"
+            },
+            "id": "parse4",
+            "name": "Parse ④ → Prep ⑤",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2380,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "prompt": "={{ $json.prompt }}"
+            },
+            "id": "chain-screener",
+            "name": "⑤ Screen Chain",
+            "type": "@n8n/n8n-nodes-langchain.chainLlm",
+            "typeVersion": 1.4,
+            "position": [
+                2620,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "google/gemma-2-9b-it-fast",
+                "options": {}
+            },
+            "id": "model-screener",
+            "name": "Chat Model: Screen",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1.2,
+            "position": [
+                2620,
+                500
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "nebius-creds",
+                    "name": "Nebius AI (OpenAI Compatible)"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const chainText = $input.first().json.text || '';\nconst prev = $node['Parse ④ → Prep ⑤'].json;\nlet screening = {};\ntry {\n  const cleaned = chainText.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  screening = JSON.parse(m ? m[1] : cleaned);\n} catch(e) { screening = { screening_report:'Parse error', screening_score:50, red_flags:[] }; }\nconst name = prev.extraction_results?.structured_data?.personal_info?.name || 'Candidate';\nconst ctx = JSON.stringify({\n  candidate_name: name,\n  skills: prev.analysis_results?.skills_analysis?.technical_skills || [],\n  years_exp: prev.analysis_results?.skills_analysis?.years_of_experience || 0,\n  top_matches: prev.job_matches?.matched_jobs || [],\n  screening_score: parseInt(screening.screening_score || 50),\n  red_flags: screening.red_flags || []\n});\nreturn [{ json: {\n  ...prev,\n  screening_results: { screening_report: screening.screening_report || 'No report', screening_timestamp: new Date().toISOString(), screening_score: parseInt(screening.screening_score || 50), red_flags: screening.red_flags || [] },\n  prompt: `You are the Chief HR Director making a FINAL hiring decision. Be decisive and professional. Return ONLY valid JSON — no markdown.\\n\\n{\\\"hiring_status\\\":\\\"Recommended|Not Recommended|Pending Review\\\",\\\"recommendation\\\":\\\"2-3 professional sentence justification\\\",\\\"next_steps\\\":[\\\"step1\\\",\\\"step2\\\"],\\\"confidence_level\\\":\\\"Low|Medium|High\\\"}\\n\\nFull candidate assessment:\\n${ctx}`\n} }];"
+            },
+            "id": "parse5",
+            "name": "Parse ⑤ → Prep ⑥",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2860,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "prompt": "={{ $json.prompt }}"
+            },
+            "id": "chain-recommender",
+            "name": "⑥ Recommend Chain",
+            "type": "@n8n/n8n-nodes-langchain.chainLlm",
+            "typeVersion": 1.4,
+            "position": [
+                3100,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "google/gemma-2-9b-it-fast",
+                "options": {}
+            },
+            "id": "model-recommender",
+            "name": "Chat Model: Recommend",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1.2,
+            "position": [
+                3100,
+                500
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "nebius-creds",
+                    "name": "Nebius AI (OpenAI Compatible)"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const chainText = $input.first().json.text || '';\nconst prev = $node['Parse ⑤ → Prep ⑥'].json;\nlet rec = {};\ntry {\n  const cleaned = chainText.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  rec = JSON.parse(m ? m[1] : cleaned);\n} catch(e) { rec = { hiring_status:'Pending Review', recommendation:'Manual review required.', next_steps:[], confidence_level:'Low' }; }\nconst { prompt, resume_text, skills_list, ...clean } = prev;\nreturn [{ json: { ...clean,\n  final_recommendation: { hiring_status: rec.hiring_status || 'Pending Review', recommendation: rec.recommendation || 'Manual review required.', next_steps: rec.next_steps || [], recommendation_timestamp: new Date().toISOString(), confidence_level: rec.confidence_level || 'Medium' },\n  status: 'completed'\n} }];"
+            },
+            "id": "build-output",
+            "name": "Build Final Output",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                3340,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ JSON.stringify($json, null, 2) }}"
+            },
+            "id": "respond",
+            "name": "Respond to Webhook",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.1,
+            "position": [
+                3560,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Setup Input",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Setup Input": {
+            "main": [
+                [
+                    {
+                        "node": "① Extract Chain",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Chat Model: Extract": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "① Extract Chain",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "① Extract Chain": {
+            "main": [
+                [
+                    {
+                        "node": "Parse ① → Prep ②",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse ① → Prep ②": {
+            "main": [
+                [
+                    {
+                        "node": "② Enhance Chain",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Chat Model: Enhance": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "② Enhance Chain",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "② Enhance Chain": {
+            "main": [
+                [
+                    {
+                        "node": "Parse ② → Prep ③",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse ② → Prep ③": {
+            "main": [
+                [
+                    {
+                        "node": "③ Analyze Chain",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Chat Model: Analyze": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "③ Analyze Chain",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "③ Analyze Chain": {
+            "main": [
+                [
+                    {
+                        "node": "Parse ③ → Prep ④",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse ③ → Prep ④": {
+            "main": [
+                [
+                    {
+                        "node": "④ Market Intel Chain",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Chat Model: Market": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "④ Market Intel Chain",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "④ Market Intel Chain": {
+            "main": [
+                [
+                    {
+                        "node": "Parse ④ → Prep ⑤",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse ④ → Prep ⑤": {
+            "main": [
+                [
+                    {
+                        "node": "⑤ Screen Chain",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Chat Model: Screen": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "⑤ Screen Chain",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "⑤ Screen Chain": {
+            "main": [
+                [
+                    {
+                        "node": "Parse ⑤ → Prep ⑥",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse ⑤ → Prep ⑥": {
+            "main": [
+                [
+                    {
+                        "node": "⑥ Recommend Chain",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Chat Model: Recommend": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "⑥ Recommend Chain",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "⑥ Recommend Chain": {
+            "main": [
+                [
+                    {
+                        "node": "Build Final Output",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Build Final Output": {
+            "main": [
+                [
+                    {
+                        "node": "Respond to Webhook",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "tags": []
+}

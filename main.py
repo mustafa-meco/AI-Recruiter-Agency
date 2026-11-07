@@ -42,7 +42,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 @app.get("/", response_class=HTMLResponse)
 async def read_candidate_root(request: Request):
     """Serve the Candidate Portal Home"""
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")
 
 @app.post("/api/candidate/analyze")
 async def analyze_candidate_resume(
@@ -115,7 +115,7 @@ async def analyze_candidate_resume(
 @app.get("/recruiter", response_class=HTMLResponse)
 async def read_recruiter_root(request: Request):
     """Serve the Recruiter Dashboard"""
-    return templates.TemplateResponse("recruiter_dashboard.html", {"request": request})
+    return templates.TemplateResponse(request, "recruiter_dashboard.html", {"provider": Config.DEFAULT_PROVIDER})
 
 @app.get("/api/recruiter/candidates")
 async def get_candidates():

@@ -1,0 +1,505 @@
+{
+    "name": "AI Recruiter Agency - Main Pipeline",
+    "nodes": [
+        {
+            "parameters": {
+                "content": "## 🎯 AI Recruiter Agency — Full Pipeline\n\nStages: Extractor → Enhancer → Analyzer → Market Intelligence → Matcher → Screener → Recommender\n\n**POST** `/webhook/process-application`\n```json\n{ \"resume_text\": \"...full resume text...\" }\n```\nReplace `YOUR_NEBIUS_API_KEY` in each HTTP Request node.",
+                "height": 300,
+                "width": 400,
+                "color": 4
+            },
+            "id": "sticky-overview",
+            "name": "Overview",
+            "type": "n8n-nodes-base.stickyNote",
+            "typeVersion": 1,
+            "position": [
+                0,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "process-application",
+                "responseMode": "responseNode"
+            },
+            "id": "webhook-trigger",
+            "name": "Webhook Trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                500,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const body = $input.first().json;\nif (!body.resume_text) throw new Error('resume_text is required');\nreturn [{ json: { resume_text: body.resume_text, candidate_id: body.candidate_id || `cand_${Date.now()}` } }];"
+            },
+            "id": "validate-input",
+            "name": "Validate Input",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                720,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const d = $input.first().json;\nconst rawText = d.resume_text.substring(0, 4000);\nconst apiBody = JSON.stringify({\n  model: 'google/gemma-2-9b-it-fast',\n  messages: [\n    { role: 'system', content: 'Extract and structure information from resumes. Return ONLY valid JSON: {\"personal_info\":{\"name\":\"\",\"email\":\"\",\"phone\":\"\",\"location\":\"\"},\"education\":[{\"institution\":\"\",\"level\":\"\",\"field\":\"\",\"year\":\"\"}],\"experience\":[{\"company\":\"\",\"role\":\"\",\"duration\":\"\",\"responsibilities\":[]}],\"technical_skills\":[],\"certifications\":[]}' },\n    { role: 'user', content: `Extract info from this resume and return ONLY valid JSON:\\n\\n${rawText}` }\n  ],\n  temperature: 0.3\n});\nreturn [{ json: { ...d, raw_text: rawText, api_body: apiBody } }];"
+            },
+            "id": "prep-extractor",
+            "name": "Prep Extractor Prompt",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                940,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.studio.nebius.ai/v1/chat/completions",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer YOUR_NEBIUS_API_KEY"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ $json.api_body }}"
+            },
+            "id": "extractor-api",
+            "name": "Extractor API Call",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1160,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const resp = $input.first().json;\nconst prev = $node['Prep Extractor Prompt'].json;\nlet structured = {};\ntry {\n  const raw = resp.choices[0].message.content;\n  const cleaned = raw.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  structured = JSON.parse(m ? m[1] : cleaned);\n} catch(e) { structured = { error: 'parse_failed' }; }\nconst apiBody = JSON.stringify({\n  model: 'google/gemma-2-9b-it-fast',\n  messages: [\n    { role: 'system', content: 'You are a Professional Profile Optimizer. Polish extracted resume data. Return ONLY JSON: {\"enhanced_summary\":\"\",\"standardized_skills\":[],\"total_years_exp\":0}' },\n    { role: 'user', content: `Enhance and standardize this candidate data: ${JSON.stringify(structured)}` }\n  ],\n  temperature: 0.4\n});\nreturn [{ json: { ...prev, extraction_results: { raw_text: prev.raw_text, structured_data: structured, status: structured.error ? 'partial' : 'completed' }, api_body: apiBody } }];"
+            },
+            "id": "parse-extractor-prep-enhancer",
+            "name": "Parse Extractor + Prep Enhancer",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1380,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.studio.nebius.ai/v1/chat/completions",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer YOUR_NEBIUS_API_KEY"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ $json.api_body }}"
+            },
+            "id": "enhancer-api",
+            "name": "Enhancer API Call",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1600,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const resp = $input.first().json;\nconst prev = $node['Parse Extractor + Prep Enhancer'].json;\nlet enhanced = {};\ntry {\n  const raw = resp.choices[0].message.content;\n  const cleaned = raw.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  enhanced = JSON.parse(m ? m[1] : cleaned);\n} catch(e) { enhanced = {}; }\nconst rawText = (prev.raw_text || '').substring(0, 2000);\nconst apiBody = JSON.stringify({\n  model: 'google/gemma-2-9b-it-fast',\n  messages: [\n    { role: 'system', content: 'Analyze candidate profiles. Junior < 3y, Mid 3-7y, Senior > 7y. Return ONLY JSON: {\"technical_skills\":[],\"years_of_experience\":0,\"education\":{\"level\":\"\",\"field\":\"\"},\"experience_level\":\"Junior|Mid-level|Senior\",\"key_achievements\":[],\"domain_expertise\":[]}' },\n    { role: 'user', content: `Analyze this candidate.\\nRaw: ${rawText}\\nStructured: ${JSON.stringify(prev.extraction_results.structured_data)}\\nEnhanced: ${JSON.stringify(enhanced)}\\n\\nReturn ONLY the JSON.` }\n  ],\n  temperature: 0.3\n});\nreturn [{ json: { ...prev, enhanced_data: enhanced, api_body: apiBody, current_stage: 'analysis' } }];"
+            },
+            "id": "parse-enhancer-prep-analyzer",
+            "name": "Parse Enhancer + Prep Analyzer",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1820,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.studio.nebius.ai/v1/chat/completions",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer YOUR_NEBIUS_API_KEY"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ $json.api_body }}"
+            },
+            "id": "analyzer-api",
+            "name": "Analyzer API Call",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2040,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const resp = $input.first().json;\nconst prev = $node['Parse Enhancer + Prep Analyzer'].json;\nlet skillsAnalysis = {};\ntry {\n  const raw = resp.choices[0].message.content;\n  const cleaned = raw.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  skillsAnalysis = JSON.parse(m ? m[1] : cleaned);\n} catch(e) {\n  skillsAnalysis = { technical_skills: [], years_of_experience: 0, education: { level: 'Unknown', field: 'Unknown' }, experience_level: 'Junior', key_achievements: [], domain_expertise: [] };\n}\nconst skills = skillsAnalysis.technical_skills || [];\nconst role = `${skillsAnalysis.experience_level || 'Mid-level'} ${skills[0] || 'Software'} Developer`;\nconst apiBody = JSON.stringify({\n  model: 'google/gemma-2-9b-it-fast',\n  messages: [\n    { role: 'system', content: 'You are a Market Intelligence Expert. Generate 3 realistic current job listings. Return ONLY JSON: {\"market_jobs\":[{\"title\":\"\",\"company\":\"\",\"location\":\"\",\"salary_range\":\"\",\"requirements\":[],\"description\":\"\"}]}' },\n    { role: 'user', content: `Generate 3 live job listings for a '${role}' candidate. Top skills: ${skills.slice(0,5).join(', ')}. Return ONLY the JSON.` }\n  ],\n  temperature: 0.6\n});\nreturn [{ json: { ...prev, analysis_results: { skills_analysis: skillsAnalysis, analysis_timestamp: new Date().toISOString().split('T')[0], confidence_score: 0.85 }, skills_for_matching: skills, exp_level: skillsAnalysis.experience_level || 'Mid-level', api_body: apiBody, current_stage: 'matching' } }];"
+            },
+            "id": "parse-analyzer-prep-market",
+            "name": "Parse Analyzer + Prep Market",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2260,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.studio.nebius.ai/v1/chat/completions",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer YOUR_NEBIUS_API_KEY"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ $json.api_body }}"
+            },
+            "id": "market-api",
+            "name": "Market Intelligence API Call",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2480,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const resp = $input.first().json;\nconst prev = $node['Parse Analyzer + Prep Market'].json;\nconst skills = prev.skills_for_matching || [];\nconst candidateSkills = new Set(skills.map(s => s.toLowerCase()));\nlet liveJobs = [];\ntry {\n  const raw = resp.choices[0].message.content;\n  const cleaned = raw.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  const parsed = JSON.parse(m ? m[1] : cleaned);\n  liveJobs = parsed.market_jobs || [];\n} catch(e) { liveJobs = []; }\nconst scoredJobs = liveJobs.map(job => {\n  const reqs = Array.isArray(job.requirements) ? job.requirements : [];\n  const reqSet = new Set(reqs.map(r => r.toLowerCase()));\n  const overlap = [...reqSet].filter(r => candidateSkills.has(r)).length;\n  const score = reqSet.size === 0 ? 75 : Math.round((overlap / reqSet.size) * 100);\n  return { title: `${job.title} at ${job.company}`, match_score: score, location: job.location || 'Remote', salary_range: job.salary_range || 'Competitive', requirements: reqs, source: 'Live Market 🌐' };\n}).filter(j => j.match_score >= 30).sort((a,b) => b.match_score - a.match_score);\nconst candidateName = prev.extraction_results?.structured_data?.personal_info?.name || 'Candidate';\nconst focusedCtx = JSON.stringify({ candidate_name: candidateName, skills_analysis: prev.analysis_results.skills_analysis, job_matches: scoredJobs.slice(0,3) });\nconst apiBody = JSON.stringify({\n  model: 'google/gemma-2-9b-it-fast',\n  messages: [\n    { role: 'system', content: 'Screen candidates based on qualification alignment, experience relevance, skill match %, and red flags. Return ONLY JSON: {\"screening_report\":\"\",\"screening_score\":75,\"red_flags\":[]}' },\n    { role: 'user', content: `Screen this candidate: ${focusedCtx}\\n\\nReturn ONLY the JSON, no markdown.` }\n  ],\n  temperature: 0.4\n});\nreturn [{ json: { ...prev, job_matches: { matched_jobs: scoredJobs.slice(0,3), match_timestamp: new Date().toISOString().split('T')[0], number_of_matches: scoredJobs.length }, api_body: apiBody, current_stage: 'screening' } }];"
+            },
+            "id": "score-jobs-prep-screener",
+            "name": "Score Jobs + Prep Screener",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2700,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.studio.nebius.ai/v1/chat/completions",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer YOUR_NEBIUS_API_KEY"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ $json.api_body }}"
+            },
+            "id": "screener-api",
+            "name": "Screener API Call",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2920,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const resp = $input.first().json;\nconst prev = $node['Score Jobs + Prep Screener'].json;\nlet screening = {};\ntry {\n  const raw = resp.choices[0].message.content;\n  const cleaned = raw.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  screening = JSON.parse(m ? m[1] : cleaned);\n} catch(e) { screening = { screening_report: 'Parse error', screening_score: 50, red_flags: [] }; }\nconst candidateName = prev.extraction_results?.structured_data?.personal_info?.name || 'Candidate';\nconst focusedCtx = JSON.stringify({\n  candidate_name: candidateName,\n  skills: prev.analysis_results?.skills_analysis?.technical_skills || [],\n  experience: prev.analysis_results?.skills_analysis?.years_of_experience || 0,\n  matches: prev.job_matches?.matched_jobs || [],\n  screening_score: parseInt(screening.screening_score || 50),\n  red_flags: screening.red_flags || []\n});\nconst apiBody = JSON.stringify({\n  model: 'google/gemma-2-9b-it-fast',\n  messages: [\n    { role: 'system', content: 'You are a Senior HR Director. Provide final hiring recommendation. Return ONLY JSON: {\"hiring_status\":\"Recommended|Not Recommended|Pending Review\",\"recommendation\":\"\",\"next_steps\":[],\"confidence_level\":\"Low|Medium|High\"}' },\n    { role: 'user', content: `Final hiring recommendation for: ${focusedCtx}\\n\\nReturn ONLY the JSON.` }\n  ],\n  temperature: 0.5\n});\nreturn [{ json: { ...prev, screening_results: { screening_report: screening.screening_report || 'No report', screening_timestamp: new Date().toISOString(), screening_score: parseInt(screening.screening_score || 50), red_flags: screening.red_flags || [] }, api_body: apiBody, current_stage: 'recommendation' } }];"
+            },
+            "id": "parse-screener-prep-recommender",
+            "name": "Parse Screener + Prep Recommender",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                3140,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.studio.nebius.ai/v1/chat/completions",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer YOUR_NEBIUS_API_KEY"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ $json.api_body }}"
+            },
+            "id": "recommender-api",
+            "name": "Recommender API Call",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                3360,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const resp = $input.first().json;\nconst prev = $node['Parse Screener + Prep Recommender'].json;\nlet rec = {};\ntry {\n  const raw = resp.choices[0].message.content;\n  const cleaned = raw.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  rec = JSON.parse(m ? m[1] : cleaned);\n} catch(e) { rec = { hiring_status: 'Pending Review', recommendation: 'Manual review required.', next_steps: [], confidence_level: 'Low' }; }\nconst { api_body, ...clean } = prev;\nreturn [{ json: { ...clean, final_recommendation: { hiring_status: rec.hiring_status || 'Pending Review', recommendation: rec.recommendation || 'Manual review required.', next_steps: rec.next_steps || [], recommendation_timestamp: new Date().toISOString(), confidence_level: rec.confidence_level || 'Medium' }, status: 'completed' } }];"
+            },
+            "id": "build-final-output",
+            "name": "Build Final Output",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                3580,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ JSON.stringify($json, null, 2) }}"
+            },
+            "id": "respond",
+            "name": "Respond to Webhook",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.1,
+            "position": [
+                3800,
+                380
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Validate Input",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Validate Input": {
+            "main": [
+                [
+                    {
+                        "node": "Prep Extractor Prompt",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prep Extractor Prompt": {
+            "main": [
+                [
+                    {
+                        "node": "Extractor API Call",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Extractor API Call": {
+            "main": [
+                [
+                    {
+                        "node": "Parse Extractor + Prep Enhancer",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse Extractor + Prep Enhancer": {
+            "main": [
+                [
+                    {
+                        "node": "Enhancer API Call",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Enhancer API Call": {
+            "main": [
+                [
+                    {
+                        "node": "Parse Enhancer + Prep Analyzer",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse Enhancer + Prep Analyzer": {
+            "main": [
+                [
+                    {
+                        "node": "Analyzer API Call",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Analyzer API Call": {
+            "main": [
+                [
+                    {
+                        "node": "Parse Analyzer + Prep Market",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse Analyzer + Prep Market": {
+            "main": [
+                [
+                    {
+                        "node": "Market Intelligence API Call",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Market Intelligence API Call": {
+            "main": [
+                [
+                    {
+                        "node": "Score Jobs + Prep Screener",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Score Jobs + Prep Screener": {
+            "main": [
+                [
+                    {
+                        "node": "Screener API Call",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Screener API Call": {
+            "main": [
+                [
+                    {
+                        "node": "Parse Screener + Prep Recommender",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse Screener + Prep Recommender": {
+            "main": [
+                [
+                    {
+                        "node": "Recommender API Call",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Recommender API Call": {
+            "main": [
+                [
+                    {
+                        "node": "Build Final Output",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Build Final Output": {
+            "main": [
+                [
+                    {
+                        "node": "Respond to Webhook",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "tags": []
+}

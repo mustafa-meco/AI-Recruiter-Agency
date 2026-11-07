@@ -86,7 +86,7 @@ class MatcherAgent(BaseAgent):
         market_data = await market_agent.run([{"content": {"role": role, "skills": skills}}])
         live_jobs = market_data.get("market_jobs", [])
         for job in live_jobs:
-             job["source"] = "Live Market 🌐"
+             job["source"] = "Example from live trends 🌐"
              # Normalize fields if needed
              if "match_score" not in job: # we'll calculate it below
                  pass

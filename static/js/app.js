@@ -68,6 +68,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Small models sometimes return {"tip": "..."} instead of a plain string.
+    function asText(item) {
+        const text = (item && typeof item === 'object') ? Object.values(item).join(': ') : String(item ?? '');
+        return text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
     function renderResults(data) {
         // 1. Render Profile Stats
         const profile = data.profile;
@@ -81,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="text-xl font-bold text-white">${profile.experience_level || 'N/A'}</div>
             </div>
             <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700 col-span-2">
-                <div class="text-slate-400 text-xs uppercase">Latest Role</div>
+                <div class="text-slate-400 text-xs uppercase">Field of study</div>
                 <div class="text-lg font-bold text-white truncate">${profile.education?.field || 'Unknown'}</div> 
             </div>
         `;
@@ -102,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="font-bold text-white">Strengths</span>
                 </div>
                 <ul class="list-disc list-inside text-sm pl-2 space-y-1">
-                    ${(advice.strengths || []).slice(0, 3).map(s => `<li>${s}</li>`).join('')}
+                    ${(advice.strengths || []).slice(0, 3).map(s => `<li>${asText(s)}</li>`).join('')}
                 </ul>
             </div>
             <div class="mb-4">
@@ -111,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="font-bold text-white">Actionable Tips</span>
                 </div>
                 <ul class="list-disc list-inside text-sm pl-2 space-y-1">
-                    ${(advice.actionable_tips || []).slice(0, 3).map(s => `<li>${s}</li>`).join('')}
+                    ${(advice.actionable_tips || []).slice(0, 3).map(s => `<li>${asText(s)}</li>`).join('')}
                 </ul>
             </div>
             <div class="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
@@ -125,14 +131,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.jobs && data.jobs.length > 0) {
             jobsContainer.innerHTML = data.jobs.map(job => `
                 <div class="job-card bg-slate-800 rounded-xl p-6 border border-slate-700 relative overflow-hidden group">
-                    <div class="absolute top-0 right-0 p-4 opacity-50">
-                        <i class="fa-solid ${job.source && job.source.includes('Live') ? 'fa-globe text-blue-400' : 'fa-database text-slate-600'} text-6xl transform rotate-12 translate-x-4 -translate-y-4"></i>
+                    <div class="absolute bottom-0 right-0 p-4 opacity-30">
+                        <i class="fa-solid ${job.source && /live/i.test(job.source) ? 'fa-globe text-blue-400' : 'fa-database text-slate-600'} text-6xl transform rotate-12 translate-x-4 translate-y-4"></i>
                     </div>
                     <div class="relative z-10">
                         <div class="flex justify-between items-start mb-4">
                             <div>
                                 <h3 class="font-bold text-lg text-white mb-1">${job.title.split(' at ')[0]}</h3>
                                 <p class="text-slate-400 text-sm">${job.title.split(' at ')[1] || 'Unknown Co'}</p>
+                                ${job.source && /live/i.test(job.source) ? '<p class="text-blue-300/80 text-xs mt-1">Example role written from search trends</p>' : ''}
                             </div>
                             <span class="px-2 py-1 bg-${parseInt(job.match_score) > 80 ? 'green' : 'yellow'}-500/20 text-${parseInt(job.match_score) > 80 ? 'green' : 'yellow'}-400 text-xs font-bold rounded-lg border border-${parseInt(job.match_score) > 80 ? 'green' : 'yellow'}-500/30">
                                 ${job.match_score} Match

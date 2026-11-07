@@ -1,3 +1,4 @@
+"""Run from the repository root: python -m scripts.live_backend_check"""
 import asyncio
 import json
 from agents.matcher_agent import MatcherAgent

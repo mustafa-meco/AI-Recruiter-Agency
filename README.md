@@ -4,6 +4,16 @@ An AI recruitment pipeline with a candidate portal and a recruiter dashboard. Ei
 
 The only resume in this repository, `resumes/sample_resume.pdf`, is made up. Keep real resumes in your local copy only: `resumes/` and `uploads/` are ignored by git.
 
+## Screenshots
+
+From a local run with `llama3.2` on the made-up sample resume. Small local models give different answers from run to run.
+
+![Candidate portal with profile analysis, career advice and job matches](docs/screenshots/candidate-portal.png)
+
+![Recruiter dashboard listing an analysed candidate](docs/screenshots/recruiter-dashboard.png)
+
+![Candidate report opened from the recruiter dashboard](docs/screenshots/recruiter-report.png)
+
 ## Origin
 
 This began as the final project of [Ollama Course: Build AI Apps Locally](https://www.youtube.com/watch?v=GWB9ApTPTv4) on the freeCodeCamp YouTube channel. I extended it with the FastAPI backend, the two dashboards, more agents and the SQLite candidate store.
@@ -22,9 +32,9 @@ This began as the final project of [Ollama Course: Build AI Apps Locally](https:
 - **Profile Enhancement**: AI-powered data standardization and enrichment
 
 ### **Advanced Matching & Intelligence**
-- **Hybrid Job Matching**: Combines SQLite database jobs with live market trends (via DuckDuckGo search)
-- **Market Intelligence**: Real-time job market analysis and trend detection
-- **Multi-Source Results**: Database jobs + live market opportunities with source attribution
+- **Hybrid Job Matching**: Combines SQLite database jobs with example roles the model writes from live DuckDuckGo search snippets about hiring trends. Those example roles are illustrative, not real openings, and they tend to score high because the model writes them from the candidate's own skills
+- **Market Intelligence**: Searches for current hiring trends and summarises them
+- **Source labels**: Each match says whether it came from the database or was generated from trends
 
 ### **Candidate Records**
 - **Persistent Storage**: SQLite database for candidates and job listings
@@ -134,9 +144,9 @@ graph LR
 
 - **Python 3.10+**
 - **Ollama** installed and running ([Download](https://ollama.com/))
-- **Model**: `gemma-2-2b-it` (or configure your preferred model)
+- **Model**: `llama3.2`, the default in `config.py`
   ```bash
-  ollama pull google/gemma-2-2b-it
+  ollama pull llama3.2
   ```
 - **(Optional)** Nebius AI API Key for cloud-based processing
 
@@ -144,7 +154,7 @@ graph LR
 
 1. **Clone the repository**:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/mustafa-meco/AI-Recruiter-Agency.git
    cd AI-Recruiter-Agency
    ```
 
@@ -181,9 +191,24 @@ uvicorn main:app --reload
 
 **Legacy Streamlit Dashboard** (Optional):
 ```bash
+pip install -r requirements-streamlit.txt
 streamlit run app.py
 ```
 *Access at: http://localhost:8501*
+
+## ✅ Tests
+
+The tests mock the LLM, so they need no model, key or network:
+
+```bash
+pytest
+```
+
+They run on every push and pull request through GitHub Actions. `scripts/` holds manual checks that call a real model, run from the repository root, for example `python -m scripts.live_workflow_check`.
+
+## 🔁 n8n version
+
+`n8n-workflows/` holds the same pipeline as seven n8n workflows: a webhook pipeline, a candidate advisor, batch processing, and agent and LLM-chain variants. Import them into n8n and add your own Nebius credential. See `n8n-workflows/README.md`.
 
 ## 📖 Usage Guide
 
@@ -195,7 +220,7 @@ streamlit run app.py
 4. **View Candidates**: Browse the candidate table with scores and recommendations
 5. **Deep Dive**: Click "View Report" to see:
    - **Analysis Tab**: Profile, skills, education, achievements
-   - **Job Matches Tab**: Top job fits with match scores (Database + Live Market)
+   - **Job Matches Tab**: Top job fits with match scores (database jobs and trend-based examples)
    - **Screening Tab**: Screening score, report, and red flags
    - **Recommendation Tab**: Hiring status and final verdict
 
@@ -243,6 +268,10 @@ AI-Recruiter-Agency/
 ├── resumes/                     # Resume storage folder
 ├── uploads/                     # Temporary upload directory
 │
+├── n8n-workflows/               # The same pipeline as importable n8n workflows
+├── scripts/                     # Manual checks that call a live model
+├── tests/                       # Offline tests, run in CI
+│
 ├── main.py                      # Unified FastAPI application
 ├── app.py                       # Legacy Streamlit dashboard
 ├── config.py                    # Configuration & LLM settings
@@ -257,8 +286,8 @@ AI-Recruiter-Agency/
 | **Extractor** | PDF parsing | Converts resumes to structured JSON with personal info, experience, education, skills |
 | **Profile Enhancer** | Data quality | Standardizes and enriches extracted data for better downstream accuracy |
 | **Analyzer** | Deep analysis | Evaluates technical skills, experience level, achievements, and education |
-| **Market Intelligence** | Live trends | Searches DuckDuckGo for current job market data and trending roles |
-| **Matcher** | Job matching | Combines database jobs + live market data, calculates compatibility scores (0-100) |
+| **Market Intelligence** | Trend-based examples | Searches DuckDuckGo for hiring trends, then writes example roles from them. They are not real openings |
+| **Matcher** | Job matching | Combines database jobs and trend-based examples, and scores compatibility (0-100) |
 | **Screener** | Qualification check | Generates screening score (0-100), identifies red flags, provides detailed report |
 | **Advisor** | Career guidance | Offers personalized tips for resume improvement and career development |
 | **Recommender** | Hiring decision | Provides final verdict (Recommended/Not Recommended/Pending) with justification |
@@ -267,20 +296,14 @@ AI-Recruiter-Agency/
 
 ### LLM Provider Setup
 
-Edit `config.py`:
+Choose the provider in `.env`. Ollama is the default:
 
-```python
-# Default provider: "ollama" or "nebius"
-DEFAULT_PROVIDER = "nebius"
-
-# Ollama settings
-OLLAMA_BASE_URL = "http://localhost:11434"
-OLLAMA_MODEL = "llama3.2"
-
-# Nebius settings
-NEBIUS_API_KEY = os.getenv("NEBIUS_API_KEY", "")  # set it in .env
-NEBIUS_MODEL = "google/gemma-2-2b-it"
+```bash
+LLM_PROVIDER=ollama        # or nebius
+NEBIUS_API_KEY=            # only needed for nebius
 ```
+
+Model names and base URLs live in `config.py` (`OLLAMA_MODEL = "llama3.2"`, `NEBIUS_MODEL = "google/gemma-2-9b-it-fast"`).
 
 ### Database Configuration
 
@@ -296,7 +319,7 @@ The system automatically initializes the SQLite database with:
 - **Solution**: Ensure Ollama is running (`ollama serve`)
 
 **Issue**: "Model not found"
-- **Solution**: Pull the required model (`ollama pull google/gemma-2-2b-it`)
+- **Solution**: Pull the required model (`ollama pull llama3.2`)
 
 **Issue**: "Duplicate candidates appearing"
 - **Solution**: Clear database and re-sync (`rm db/jobs.sqlite` then restart)

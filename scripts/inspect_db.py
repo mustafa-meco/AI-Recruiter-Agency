@@ -1,3 +1,4 @@
+"""Run from the repository root: python -m scripts.inspect_db"""
 import sqlite3
 import json
 

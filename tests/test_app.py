@@ -59,3 +59,14 @@ def test_candidate_pipeline_on_the_sample_resume(client, monkeypatch):
         )
     assert response.status_code == 200
     assert response.json().get("status") == "success", response.json()
+
+
+def test_portal_works_without_a_nebius_key(client):
+    page = client.get("/").text
+    key_field = page[page.index('id="nebiusKey"'):].split(">", 1)[0]
+    assert "required" not in key_field
+
+
+def test_dashboard_names_the_configured_provider(client):
+    page = client.get("/recruiter").text
+    assert ("Local Ollama active" in page) == (main.Config.DEFAULT_PROVIDER != "nebius")

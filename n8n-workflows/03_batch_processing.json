@@ -1,0 +1,234 @@
+{
+    "name": "AI Recruiter - Batch Resume Processing",
+    "nodes": [
+        {
+            "parameters": {
+                "content": "## 📦 Batch Resume Processing\n\nProcesses multiple resumes by calling the main pipeline.\n\n**Triggers:** Manual or daily schedule\n\n**Configure in 'Load Resume Queue' node:**\n- `PIPELINE_WEBHOOK_URL` → your main pipeline URL\n- `resumes` array → list of resume file paths or texts",
+                "height": 280,
+                "width": 380,
+                "color": 6
+            },
+            "id": "sticky-overview",
+            "name": "Overview",
+            "type": "n8n-nodes-base.stickyNote",
+            "typeVersion": 1,
+            "position": [
+                0,
+                0
+            ]
+        },
+        {
+            "parameters": {},
+            "id": "manual-trigger",
+            "name": "Manual Trigger",
+            "type": "n8n-nodes-base.manualTrigger",
+            "typeVersion": 1,
+            "position": [
+                300,
+                360
+            ]
+        },
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "hours",
+                            "hoursInterval": 24
+                        }
+                    ]
+                }
+            },
+            "id": "cron-trigger",
+            "name": "Scheduled Trigger (Daily)",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.2,
+            "position": [
+                300,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// ⚙️ CONFIGURE THESE:\nconst PIPELINE_WEBHOOK_URL = 'http://localhost:5678/webhook/process-application';\n\n// Replace with your actual resumes (text or file_path)\nconst resumes = [\n  { resume_text: 'John Doe\\nSoftware Engineer with 5 years Python, AWS, React...', candidate_id: 'cand_001' },\n  { resume_text: 'Jane Smith\\nData Scientist with 3 years ML, TensorFlow, SQL...', candidate_id: 'cand_002' },\n  { resume_text: 'Bob Johnson\\nDevOps Engineer with 7 years Kubernetes, Docker, CI/CD...', candidate_id: 'cand_003' }\n];\n\nreturn resumes.map(r => ({ json: { ...r, pipeline_url: PIPELINE_WEBHOOK_URL, batch_id: `batch_${Date.now()}` } }));"
+            },
+            "id": "load-resumes",
+            "name": "Load Resume Queue",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                540,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "batchSize": 1
+            },
+            "id": "loop",
+            "name": "Loop Over Resumes",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3,
+            "position": [
+                760,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "={{ $json.pipeline_url }}",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ resume_text: $json.resume_text, candidate_id: $json.candidate_id }) }}"
+            },
+            "id": "call-pipeline",
+            "name": "Call Main Pipeline",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                980,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const result = $input.first().json;\nreturn [{ json: {\n  candidate_id: result.candidate_id || 'unknown',\n  status: result.status || 'unknown',\n  hiring_status: result.final_recommendation?.hiring_status || 'N/A',\n  screening_score: result.screening_results?.screening_score || 0,\n  top_match: result.job_matches?.matched_jobs?.[0]?.title || 'None',\n  recommendation: result.final_recommendation?.recommendation || '',\n  processed_at: new Date().toISOString()\n} }];"
+            },
+            "id": "extract-result",
+            "name": "Extract Key Result",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1200,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "aggregate": "aggregateAllItemData",
+                "destinationFieldName": "results"
+            },
+            "id": "aggregate-results",
+            "name": "Aggregate All Results",
+            "type": "n8n-nodes-base.aggregate",
+            "typeVersion": 1,
+            "position": [
+                1420,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const d = $input.first().json;\nconst results = d.results || [];\nconst total = results.length;\nconst recommended = results.filter(r => r.hiring_status === 'Recommended').length;\nconst notRec = results.filter(r => r.hiring_status === 'Not Recommended').length;\nconst pending = total - recommended - notRec;\nconst rows = results.map(r => `| ${r.candidate_id} | ${r.hiring_status} | ${r.screening_score} | ${r.top_match} |`).join('\\n');\nreturn [{ json: {\n  summary: { total_processed: total, recommended, not_recommended: notRec, pending_review: pending, processed_at: new Date().toISOString() },\n  markdown_report: `# Batch Recruitment Report\\n\\n**Total**: ${total} | ✅ **Recommended**: ${recommended} | ❌ **Not Recommended**: ${notRec} | ⏳ **Pending**: ${pending}\\n\\n| Candidate | Status | Score | Top Match |\\n|---|---|---|---|\\n${rows}`\n} }];"
+            },
+            "id": "build-report",
+            "name": "Build Summary Report",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1640,
+                400
+            ]
+        }
+    ],
+    "connections": {
+        "Manual Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Load Resume Queue",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Scheduled Trigger (Daily)": {
+            "main": [
+                [
+                    {
+                        "node": "Load Resume Queue",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Load Resume Queue": {
+            "main": [
+                [
+                    {
+                        "node": "Loop Over Resumes",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Loop Over Resumes": {
+            "main": [
+                [
+                    {
+                        "node": "Call Main Pipeline",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Aggregate All Results",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Call Main Pipeline": {
+            "main": [
+                [
+                    {
+                        "node": "Extract Key Result",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Extract Key Result": {
+            "main": [
+                [
+                    {
+                        "node": "Loop Over Resumes",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Aggregate All Results": {
+            "main": [
+                [
+                    {
+                        "node": "Build Summary Report",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "tags": []
+}

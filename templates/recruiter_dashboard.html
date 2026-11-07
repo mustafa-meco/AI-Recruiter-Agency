@@ -25,7 +25,7 @@
                     </span>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <span class="text-sm text-slate-400">Nebius AI Active</span>
+                    <span id="providerStatus" class="text-sm text-slate-400" data-default="{{ 'Nebius AI active' if provider == 'nebius' else 'Local Ollama active' }}">{{ 'Nebius AI active' if provider == 'nebius' else 'Local Ollama active' }}</span>
                     <button id="settingsBtn"
                         class="bg-slate-800 hover:bg-slate-700 border border-white/10 px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center">
                         <i data-lucide="settings" class="h-4 w-4 mr-2 text-slate-400"></i> Settings
@@ -582,17 +582,15 @@
             const key = document.getElementById('nebiusKeyInput').value.trim();
             if (key) {
                 localStorage.setItem('nebius_api_key', key);
-                // This selector might need to be more specific if there are other similar elements
-                // For now, assuming it targets a status indicator for Nebius AI
-                const nebiusStatusElement = document.querySelector('.text-sm.text-slate-400');
+                const nebiusStatusElement = document.getElementById('providerStatus');
                 if (nebiusStatusElement) {
-                    nebiusStatusElement.innerText = 'Nebius AI Active (Custom Key)';
+                    nebiusStatusElement.innerText = 'Nebius AI active (your key)';
                 }
             } else {
                 localStorage.removeItem('nebius_api_key');
-                const nebiusStatusElement = document.querySelector('.text-sm.text-slate-400');
+                const nebiusStatusElement = document.getElementById('providerStatus');
                 if (nebiusStatusElement) {
-                    nebiusStatusElement.innerText = 'Nebius AI Active';
+                    nebiusStatusElement.innerText = nebiusStatusElement.dataset.default;
                 }
             }
             closeSettings();
@@ -602,10 +600,9 @@
         // Initialize status on load
         window.addEventListener('DOMContentLoaded', () => {
             if (localStorage.getItem('nebius_api_key')) {
-                // This selector might need to be more specific if there are other similar elements
-                const nebiusStatusElement = document.querySelector('.text-sm.text-slate-400');
+                const nebiusStatusElement = document.getElementById('providerStatus');
                 if (nebiusStatusElement) {
-                    nebiusStatusElement.innerText = 'Nebius AI Active (Custom Key)';
+                    nebiusStatusElement.innerText = 'Nebius AI active (your key)';
                 }
             }
         });

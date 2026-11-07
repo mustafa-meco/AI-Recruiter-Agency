@@ -1,3 +1,4 @@
+"""Run from the repository root: python -m scripts.live_workflow_check"""
 import asyncio
 import json
 from agents.orchestrator import OrchestratorAgent

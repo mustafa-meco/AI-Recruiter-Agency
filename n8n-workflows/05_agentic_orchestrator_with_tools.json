@@ -1,0 +1,304 @@
+{
+    "name": "AI Recruiter - Orchestrator Agent with Tools",
+    "nodes": [
+        {
+            "parameters": {
+                "content": "## 🧠 Orchestrator Agent + Recruitment Tools\n\nA **single visible Orchestrator AI Agent** decides which tools to call and in what order — just like an autonomous AI agent.\n\n**Tools connected to the Orchestrator:**\n🔧 Extract Resume → 🔧 Analyze Skills → 🔧 Find Job Matches → 🔧 Screen Candidate → 🔧 Generate Recommendation\n\n**Setup:**\n1. Create **OpenAI API** credential with Nebius key + base URL\n2. Assign to the model node\n3. POST `resume_text` to webhook\n\n> The Orchestrator autonomously decides tool order and combines results.",
+                "height": 360,
+                "width": 480,
+                "color": 7
+            },
+            "id": "sticky-overview",
+            "name": "Overview",
+            "type": "n8n-nodes-base.stickyNote",
+            "typeVersion": 1,
+            "position": [
+                0,
+                -120
+            ]
+        },
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "orchestrator-agent",
+                "responseMode": "responseNode"
+            },
+            "id": "webhook-trigger",
+            "name": "Webhook Trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                240,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const body = $input.first().json;\nif (!body.resume_text) throw new Error('resume_text is required');\nreturn [{ json: {\n  resume_text: body.resume_text,\n  candidate_id: body.candidate_id || `cand_${Date.now()}`,\n  prompt: `You are an AI Recruitment Orchestrator. Process this job application by using the available tools in this order:\\n1. extract_resume — to parse the resume\\n2. analyze_skills — to analyze extracted data\\n3. find_job_matches — to find matching jobs\\n4. screen_candidate — to screen based on matches\\n5. generate_recommendation — to produce final hiring decision\\n\\nResume Text:\\n${body.resume_text.substring(0, 3000)}\\n\\nAfter using all tools, summarize the complete recruitment assessment as a final JSON report.`\n} }];"
+            },
+            "id": "setup-input",
+            "name": "Setup Input",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                460,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "promptType": "define",
+                "text": "={{ $json.prompt }}",
+                "options": {
+                    "systemMessage": "You are an AI Recruitment Orchestrator Agent. Your job is to process job applications by coordinating specialized recruitment tools. You MUST use ALL tools provided to you in a logical order. After using all tools, compile a complete recruitment assessment report. Always be thorough and systematic. Use tools to gather all necessary information before making any recommendations."
+                }
+            },
+            "id": "orchestrator-agent",
+            "name": "🧠 Orchestrator Agent",
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 1.7,
+            "position": [
+                700,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "google/gemma-2-9b-it-fast",
+                "options": {}
+            },
+            "id": "model-orchestrator",
+            "name": "Model: Orchestrator",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1.2,
+            "position": [
+                460,
+                520
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "nebius-creds",
+                    "name": "Nebius AI (OpenAI Compatible)"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "name": "extract_resume",
+                "description": "Extracts and structures information from raw resume text. Use this tool FIRST to parse the resume into structured data including personal info, education, work experience, technical skills, and certifications. Input: the raw resume text.",
+                "jsCode": "// TOOL: Resume Extractor\nconst resumeText = $input.first().json.query || '';\n\n// Build structured extraction prompt\nconst systemPrompt = 'Extract resume. Return ONLY JSON: {\"personal_info\":{\"name\":\"\",\"email\":\"\",\"phone\":\"\",\"location\":\"\"},\"education\":[{\"institution\":\"\",\"level\":\"\",\"field\":\"\",\"year\":\"\"}],\"experience\":[{\"company\":\"\",\"role\":\"\",\"duration\":\"\",\"responsibilities\":[]}],\"technical_skills\":[],\"certifications\":[]}';\n\nlet extracted = {};\ntry {\n  const response = await $helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.studio.nebius.ai/v1/chat/completions',\n    headers: { 'Authorization': 'Bearer YOUR_NEBIUS_API_KEY', 'Content-Type': 'application/json' },\n    body: JSON.stringify({ model: 'google/gemma-2-9b-it-fast', messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: resumeText.substring(0, 4000) }], temperature: 0.3 })\n  });\n  const result = JSON.parse(response);\n  const raw = result.choices[0].message.content;\n  const cleaned = raw.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  extracted = JSON.parse(m ? m[1] : cleaned);\n} catch(e) { extracted = { error: e.message }; }\n\nreturn [{ json: { extracted_profile: extracted, tool: 'extract_resume', status: extracted.error ? 'failed' : 'success' } }];"
+            },
+            "id": "tool-extract",
+            "name": "🔧 Tool: Extract Resume",
+            "type": "@n8n/n8n-nodes-langchain.toolCode",
+            "typeVersion": 1.1,
+            "position": [
+                460,
+                700
+            ]
+        },
+        {
+            "parameters": {
+                "name": "analyze_skills",
+                "description": "Analyzes a candidate's extracted profile to determine technical skills, years of experience, education level, experience level (Junior/Mid-level/Senior), key achievements, and domain expertise. Use this tool SECOND after extract_resume. Input: the extracted profile JSON as text.",
+                "jsCode": "// TOOL: Skills Analyzer\nconst input = $input.first().json.query || '';\n\nconst systemPrompt = 'Analyze this candidate profile. Rules: Junior < 3yr, Mid 3-7yr, Senior > 7yr. Return ONLY JSON: {\"technical_skills\":[],\"years_of_experience\":0,\"education\":{\"level\":\"\",\"field\":\"\"},\"experience_level\":\"Junior|Mid-level|Senior\",\"key_achievements\":[],\"domain_expertise\":[]}';\n\nlet analysis = {};\ntry {\n  const response = await $helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.studio.nebius.ai/v1/chat/completions',\n    headers: { 'Authorization': 'Bearer YOUR_NEBIUS_API_KEY', 'Content-Type': 'application/json' },\n    body: JSON.stringify({ model: 'google/gemma-2-9b-it-fast', messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: input }], temperature: 0.3 })\n  });\n  const result = JSON.parse(response);\n  const raw = result.choices[0].message.content;\n  const cleaned = raw.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  analysis = JSON.parse(m ? m[1] : cleaned);\n} catch(e) { analysis = { error: e.message, technical_skills: [], experience_level: 'Junior' }; }\n\nreturn [{ json: { skills_analysis: analysis, tool: 'analyze_skills', status: analysis.error ? 'failed' : 'success' } }];"
+            },
+            "id": "tool-analyze",
+            "name": "🔧 Tool: Analyze Skills",
+            "type": "@n8n/n8n-nodes-langchain.toolCode",
+            "typeVersion": 1.1,
+            "position": [
+                700,
+                700
+            ]
+        },
+        {
+            "parameters": {
+                "name": "find_job_matches",
+                "description": "Searches the current job market and generates realistic, up-to-date job listings that match the candidate's skills and experience level. Use this tool THIRD after analyze_skills. Input: JSON with candidate role and top skills.",
+                "jsCode": "// TOOL: Job Matcher & Market Intelligence\nconst input = $input.first().json.query || '';\n\nconst systemPrompt = 'You are a Market Intelligence Expert. Generate 3 realistic 2026 job listings matching this candidate. Return ONLY JSON: {\"matched_jobs\":[{\"title\":\"\",\"company\":\"\",\"location\":\"\",\"salary_range\":\"\",\"match_score\":85,\"requirements\":[],\"source\":\"Live Market 🌐\"}]}';\n\nlet jobMatches = {};\ntry {\n  const response = await $helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.studio.nebius.ai/v1/chat/completions',\n    headers: { 'Authorization': 'Bearer YOUR_NEBIUS_API_KEY', 'Content-Type': 'application/json' },\n    body: JSON.stringify({ model: 'google/gemma-2-9b-it-fast', messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: input }], temperature: 0.6 })\n  });\n  const result = JSON.parse(response);\n  const raw = result.choices[0].message.content;\n  const cleaned = raw.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  jobMatches = JSON.parse(m ? m[1] : cleaned);\n} catch(e) { jobMatches = { matched_jobs: [], error: e.message }; }\n\nreturn [{ json: { job_matches: jobMatches, tool: 'find_job_matches', status: jobMatches.error ? 'failed' : 'success' } }];"
+            },
+            "id": "tool-match",
+            "name": "🔧 Tool: Find Job Matches",
+            "type": "@n8n/n8n-nodes-langchain.toolCode",
+            "typeVersion": 1.1,
+            "position": [
+                940,
+                700
+            ]
+        },
+        {
+            "parameters": {
+                "name": "screen_candidate",
+                "description": "Performs a formal HR screening of the candidate against the matched job opportunities. Produces a detailed screening report with a score (0-100) and identifies any red flags. Use this tool FOURTH after find_job_matches. Input: JSON with candidate profile and job matches.",
+                "jsCode": "// TOOL: Candidate Screener\nconst input = $input.first().json.query || '';\n\nconst systemPrompt = 'You are a senior HR Screener. Evaluate this candidate against the job matches. Return ONLY JSON: {\"screening_report\":\"3-4 sentence detailed assessment\",\"screening_score\":75,\"red_flags\":[\"flag1\"]}';\n\nlet screening = {};\ntry {\n  const response = await $helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.studio.nebius.ai/v1/chat/completions',\n    headers: { 'Authorization': 'Bearer YOUR_NEBIUS_API_KEY', 'Content-Type': 'application/json' },\n    body: JSON.stringify({ model: 'google/gemma-2-9b-it-fast', messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: input }], temperature: 0.4 })\n  });\n  const result = JSON.parse(response);\n  const raw = result.choices[0].message.content;\n  const cleaned = raw.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  screening = JSON.parse(m ? m[1] : cleaned);\n} catch(e) { screening = { screening_report: 'Error', screening_score: 50, red_flags: [] }; }\n\nreturn [{ json: { screening_results: screening, tool: 'screen_candidate', status: 'success' } }];"
+            },
+            "id": "tool-screen",
+            "name": "🔧 Tool: Screen Candidate",
+            "type": "@n8n/n8n-nodes-langchain.toolCode",
+            "typeVersion": 1.1,
+            "position": [
+                1180,
+                700
+            ]
+        },
+        {
+            "parameters": {
+                "name": "generate_recommendation",
+                "description": "Generates the final hiring recommendation from a Senior HR Director perspective. This is the LAST tool to call — use it FIFTH after screen_candidate. Returns hiring status (Recommended/Not Recommended/Pending Review), justification, next steps, and confidence level. Input: complete candidate assessment data as JSON.",
+                "jsCode": "// TOOL: Final Recommender\nconst input = $input.first().json.query || '';\n\nconst systemPrompt = 'You are a Senior HR Director. Generate a final hiring recommendation. Return ONLY JSON: {\"hiring_status\":\"Recommended|Not Recommended|Pending Review\",\"recommendation\":\"2-3 professional sentences\",\"next_steps\":[\"step1\",\"step2\"],\"confidence_level\":\"Low|Medium|High\"}';\n\nlet recommendation = {};\ntry {\n  const response = await $helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.studio.nebius.ai/v1/chat/completions',\n    headers: { 'Authorization': 'Bearer YOUR_NEBIUS_API_KEY', 'Content-Type': 'application/json' },\n    body: JSON.stringify({ model: 'google/gemma-2-9b-it-fast', messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: input }], temperature: 0.5 })\n  });\n  const result = JSON.parse(response);\n  const raw = result.choices[0].message.content;\n  const cleaned = raw.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  recommendation = JSON.parse(m ? m[1] : cleaned);\n} catch(e) { recommendation = { hiring_status: 'Pending Review', recommendation: 'Manual review required.', next_steps: [], confidence_level: 'Low' }; }\n\nreturn [{ json: { final_recommendation: recommendation, tool: 'generate_recommendation', status: 'success' } }];"
+            },
+            "id": "tool-recommend",
+            "name": "🔧 Tool: Generate Recommendation",
+            "type": "@n8n/n8n-nodes-langchain.toolCode",
+            "typeVersion": 1.1,
+            "position": [
+                1420,
+                700
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const agentOutput = $input.first().json.output || 'No output';\nconst prev = $node['Setup Input'].json;\nreturn [{ json: {\n  candidate_id: prev.candidate_id,\n  orchestrator_summary: agentOutput,\n  status: 'completed',\n  timestamp: new Date().toISOString()\n} }];"
+            },
+            "id": "build-response",
+            "name": "Build Response",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                940,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ JSON.stringify($json, null, 2) }}"
+            },
+            "id": "respond",
+            "name": "Respond to Webhook",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.1,
+            "position": [
+                1160,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Setup Input",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Setup Input": {
+            "main": [
+                [
+                    {
+                        "node": "🧠 Orchestrator Agent",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Model: Orchestrator": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "🧠 Orchestrator Agent",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🔧 Tool: Extract Resume": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "🧠 Orchestrator Agent",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🔧 Tool: Analyze Skills": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "🧠 Orchestrator Agent",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🔧 Tool: Find Job Matches": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "🧠 Orchestrator Agent",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🔧 Tool: Screen Candidate": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "🧠 Orchestrator Agent",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🔧 Tool: Generate Recommendation": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "🧠 Orchestrator Agent",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🧠 Orchestrator Agent": {
+            "main": [
+                [
+                    {
+                        "node": "Build Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Build Response": {
+            "main": [
+                [
+                    {
+                        "node": "Respond to Webhook",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "tags": []
+}

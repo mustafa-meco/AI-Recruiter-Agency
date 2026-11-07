@@ -1,0 +1,358 @@
+{
+    "name": "AI Recruiter - LLM Chain Candidate Advisor",
+    "nodes": [
+        {
+            "parameters": {
+                "content": "## ⛓️ LLM Chain Candidate Advisor\n\nSelf-service portal using **Basic LLM Chain** AI nodes.\n\n**Two visible AI chains on canvas:**\n① Extract Profile → ② Career Advice\n\n**POST** `/webhook/llm-candidate-advisor`\n```json\n{ \"resume_text\": \"...\", \"candidate_email\": \"optional\" }\n```\nAssign your **OpenAI API** credential (Nebius) to each Chat Model node.",
+                "height": 280,
+                "width": 420,
+                "color": 3
+            },
+            "id": "sticky",
+            "name": "Overview",
+            "type": "n8n-nodes-base.stickyNote",
+            "typeVersion": 1,
+            "position": [
+                0,
+                -80
+            ]
+        },
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "llm-candidate-advisor",
+                "responseMode": "responseNode"
+            },
+            "id": "webhook",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                240,
+                300
+            ],
+            "webhookId": "llm-candidate-advisor"
+        },
+        {
+            "parameters": {
+                "jsCode": "const body = $input.first().json;\nif (!body.resume_text) throw new Error('resume_text is required');\nreturn [{ json: {\n  resume_text: body.resume_text,\n  candidate_email: body.candidate_email || '',\n  session_id: `session_${Date.now()}`,\n  prompt: `You are a professional Resume Parser. Extract all structured information from the resume text below. Return ONLY valid JSON — no markdown, no explanation.\\n\\n{\\\"personal_info\\\":{\\\"name\\\":\\\"\\\",\\\"email\\\":\\\"\\\",\\\"phone\\\":\\\"\\\",\\\"location\\\":\\\"\\\"},\\\"education\\\":[{\\\"institution\\\":\\\"\\\",\\\"level\\\":\\\"\\\",\\\"field\\\":\\\"\\\",\\\"year\\\":\\\"\\\"}],\\\"experience\\\":[{\\\"company\\\":\\\"\\\",\\\"role\\\":\\\"\\\",\\\"duration\\\":\\\"\\\",\\\"responsibilities\\\":[]}],\\\"technical_skills\\\":[],\\\"certifications\\\":[]}\\n\\nResume:\\n${body.resume_text.substring(0, 4000)}`\n} }];"
+            },
+            "id": "setup",
+            "name": "Setup Input",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                460,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "prompt": "={{ $json.prompt }}"
+            },
+            "id": "chain-extract",
+            "name": "① Extract Profile Chain",
+            "type": "@n8n/n8n-nodes-langchain.chainLlm",
+            "typeVersion": 1.4,
+            "position": [
+                700,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "google/gemma-2-9b-it-fast",
+                "options": {}
+            },
+            "id": "model-extract",
+            "name": "Chat Model: Extract",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1.2,
+            "position": [
+                700,
+                500
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "nebius-creds",
+                    "name": "Nebius AI (OpenAI Compatible)"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const chainText = $input.first().json.text || '';\nconst prev = $node['Setup Input'].json;\nlet extracted = {};\ntry {\n  const cleaned = chainText.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  extracted = JSON.parse(m ? m[1] : cleaned);\n} catch(e) { extracted = { error: 'parse_failed' }; }\nreturn [{ json: {\n  ...prev,\n  extracted_profile: extracted,\n  prompt: `You are an expert Career Coach AI. Analyze this candidate's extracted profile and provide detailed, actionable career advice. Be specific and encouraging. Return ONLY valid JSON — no markdown.\\n\\n{\\\"strengths\\\":[\\\"specific strength 1\\\",\\\"specific strength 2\\\"],\\\"skill_gaps\\\":[\\\"gap 1\\\",\\\"gap 2\\\"],\\\"cv_improvements\\\":[\\\"specific improvement 1\\\",\\\"specific improvement 2\\\"],\\\"career_suggestions\\\":[\\\"career path 1\\\",\\\"career path 2\\\"],\\\"overall_assessment\\\":\\\"2-3 sentence holistic assessment of the candidate\\\"}\\n\\nCandidate profile:\\n${JSON.stringify(extracted)}`\n} }];"
+            },
+            "id": "parse-extract",
+            "name": "Parse ① → Prep ②",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                940,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "prompt": "={{ $json.prompt }}"
+            },
+            "id": "chain-advise",
+            "name": "② Career Advice Chain",
+            "type": "@n8n/n8n-nodes-langchain.chainLlm",
+            "typeVersion": 1.4,
+            "position": [
+                1180,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "google/gemma-2-9b-it-fast",
+                "options": {}
+            },
+            "id": "model-advise",
+            "name": "Chat Model: Advise",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1.2,
+            "position": [
+                1180,
+                500
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "nebius-creds",
+                    "name": "Nebius AI (OpenAI Compatible)"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const chainText = $input.first().json.text || '';\nconst prev = $node['Parse ① → Prep ②'].json;\nlet advice = {};\ntry {\n  const cleaned = chainText.replace(/```json/g,'').replace(/```/g,'').trim();\n  const m = cleaned.match(/(\\{[\\s\\S]*\\})/);\n  advice = JSON.parse(m ? m[1] : cleaned);\n} catch(e) { advice = { overall_assessment: 'Could not generate advice.' }; }\nconst { prompt, ...clean } = prev;\nreturn [{ json: { ...clean, career_advice: advice, timestamp: new Date().toISOString() } }];"
+            },
+            "id": "build-result",
+            "name": "Build Result",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1420,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                    },
+                    "conditions": [
+                        {
+                            "id": "email-check",
+                            "leftValue": "={{ $json.candidate_email }}",
+                            "rightValue": "",
+                            "operator": {
+                                "type": "string",
+                                "operation": "notEmpty",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            },
+            "id": "check-email",
+            "name": "Has Email?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                1640,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const d = $input.first().json;\nconst name = d.extracted_profile?.personal_info?.name || 'Candidate';\nconst a = d.career_advice || {};\nconst li = arr => (arr||[]).map(x=>`<li>${x}</li>`).join('');\nreturn [{ json: { ...d,\n  email_subject: `Your AI Career Assessment — ${name}`,\n  email_html: `<h2>AI Career Assessment 🎯</h2><p>Hi ${name},</p><p><b>Overall:</b> ${a.overall_assessment}</p><h3>✅ Strengths</h3><ul>${li(a.strengths)}</ul><h3>📈 Skill Gaps</h3><ul>${li(a.skill_gaps)}</ul><h3>📝 CV Improvements</h3><ul>${li(a.cv_improvements)}</ul><h3>🚀 Career Paths</h3><ul>${li(a.career_suggestions)}</ul>`\n} }];"
+            },
+            "id": "build-email",
+            "name": "Build Email",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1860,
+                180
+            ]
+        },
+        {
+            "parameters": {
+                "fromEmail": "recruiter@example.com",
+                "toEmail": "={{ $json.candidate_email }}",
+                "subject": "={{ $json.email_subject }}",
+                "emailType": "html",
+                "message": "={{ $json.email_html }}"
+            },
+            "id": "send-email",
+            "name": "Send Email",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2.1,
+            "position": [
+                2080,
+                180
+            ],
+            "credentials": {
+                "smtp": {
+                    "id": "smtp-creds",
+                    "name": "SMTP"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ JSON.stringify($json, null, 2) }}"
+            },
+            "id": "respond",
+            "name": "Respond to Webhook",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.1,
+            "position": [
+                1860,
+                440
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Setup Input",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Setup Input": {
+            "main": [
+                [
+                    {
+                        "node": "① Extract Profile Chain",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Chat Model: Extract": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "① Extract Profile Chain",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "① Extract Profile Chain": {
+            "main": [
+                [
+                    {
+                        "node": "Parse ① → Prep ②",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse ① → Prep ②": {
+            "main": [
+                [
+                    {
+                        "node": "② Career Advice Chain",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Chat Model: Advise": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "② Career Advice Chain",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "② Career Advice Chain": {
+            "main": [
+                [
+                    {
+                        "node": "Build Result",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Build Result": {
+            "main": [
+                [
+                    {
+                        "node": "Has Email?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Has Email?": {
+            "main": [
+                [
+                    {
+                        "node": "Build Email",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Respond to Webhook",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Build Email": {
+            "main": [
+                [
+                    {
+                        "node": "Send Email",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Send Email": {
+            "main": [
+                [
+                    {
+                        "node": "Respond to Webhook",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "tags": []
+}

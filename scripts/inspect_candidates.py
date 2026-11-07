@@ -1,3 +1,4 @@
+"""Run from the repository root: python -m scripts.inspect_candidates"""
 from db.database import JobDatabase
 import json
 
