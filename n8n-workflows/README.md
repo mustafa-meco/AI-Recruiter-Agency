@@ -33,6 +33,11 @@ Replace `YOUR_NEBIUS_API_KEY` in all API Call nodes with your own Nebius key. Ne
 
 ---
 
+## 🔒 Before you activate
+
+- Every webhook requires a **Header Auth** credential named `Webhook Header Auth`. Create it in n8n with a long random value, and send that header from your callers. Batch processing (`03`) already sends it. Without it, anyone who finds the URL can run the pipeline on your LLM key.
+- The two email nodes (`02`, `07`) are **disabled**. If you enable them, they send to the address in the request, so keep the webhook authenticated and only accept addresses you have verified. The email body is HTML-escaped.
+
 ## 🔧 Webhook Endpoints
 
 After importing and activating:

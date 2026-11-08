@@ -21,7 +21,8 @@
             "parameters": {
                 "httpMethod": "POST",
                 "path": "candidate-advisor",
-                "responseMode": "responseNode"
+                "responseMode": "responseNode",
+                "authentication": "headerAuth"
             },
             "id": "webhook-trigger",
             "name": "Candidate Advisor Webhook",
@@ -31,7 +32,13 @@
                 500,
                 380
             ],
-            "webhookId": "candidate-advisor-webhook"
+            "webhookId": "candidate-advisor-webhook",
+            "credentials": {
+                "httpHeaderAuth": {
+                    "id": "webhook-header-auth",
+                    "name": "Webhook Header Auth"
+                }
+            }
         },
         {
             "parameters": {
@@ -179,7 +186,7 @@
         },
         {
             "parameters": {
-                "jsCode": "const d = $input.first().json;\nconst name = d.extracted_profile?.personal_info?.name || 'Candidate';\nconst advice = d.career_advice || {};\nconst strengths = (advice.strengths || []).map(s => `<li>${s}</li>`).join('');\nconst gaps = (advice.skill_gaps || []).map(g => `<li>${g}</li>`).join('');\nconst improvements = (advice.cv_improvements || []).map(i => `<li>${i}</li>`).join('');\nconst suggestions = (advice.career_suggestions || []).map(c => `<li>${c}</li>`).join('');\nreturn [{ json: { ...d,\n  email_subject: `Your AI Career Assessment is Ready, ${name}!`,\n  email_html: `<h2>Your AI Career Assessment 🎯</h2><p>Hi ${name},</p><p><strong>Overall Assessment:</strong> ${advice.overall_assessment}</p><h3>✅ Key Strengths</h3><ul>${strengths}</ul><h3>📈 Skill Gaps</h3><ul>${gaps}</ul><h3>📝 CV Improvements</h3><ul>${improvements}</ul><h3>🚀 Career Paths</h3><ul>${suggestions}</ul>`\n} }];"
+                "jsCode": "const d = $input.first().json;\nconst esc = v => String(v ?? '').replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\nconst name = esc(d.extracted_profile?.personal_info?.name || 'Candidate');\nconst advice = d.career_advice || {};\nconst strengths = (advice.strengths || []).map(s => `<li>${esc(s)}</li>`).join('');\nconst gaps = (advice.skill_gaps || []).map(g => `<li>${esc(g)}</li>`).join('');\nconst improvements = (advice.cv_improvements || []).map(i => `<li>${esc(i)}</li>`).join('');\nconst suggestions = (advice.career_suggestions || []).map(c => `<li>${esc(c)}</li>`).join('');\nreturn [{ json: { ...d,\n  email_subject: `Your AI Career Assessment is Ready, ${name}!`.replace(/[\\r\\n]+/g, ' '),\n  email_html: `<h2>Your AI Career Assessment 🎯</h2><p>Hi ${name},</p><p><strong>Overall Assessment:</strong> ${esc(advice.overall_assessment)}</p><h3>✅ Key Strengths</h3><ul>${strengths}</ul><h3>📈 Skill Gaps</h3><ul>${gaps}</ul><h3>📝 CV Improvements</h3><ul>${improvements}</ul><h3>🚀 Career Paths</h3><ul>${suggestions}</ul>`\n} }];"
             },
             "id": "build-email",
             "name": "Build Email HTML",
@@ -211,7 +218,8 @@
                     "id": "smtp-creds",
                     "name": "SMTP"
                 }
-            }
+            },
+            "disabled": true
         },
         {
             "parameters": {

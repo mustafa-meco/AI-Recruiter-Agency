@@ -21,7 +21,8 @@
             "parameters": {
                 "httpMethod": "POST",
                 "path": "orchestrator-agent",
-                "responseMode": "responseNode"
+                "responseMode": "responseNode",
+                "authentication": "headerAuth"
             },
             "id": "webhook-trigger",
             "name": "Webhook Trigger",
@@ -30,7 +31,13 @@
             "position": [
                 240,
                 300
-            ]
+            ],
+            "credentials": {
+                "httpHeaderAuth": {
+                    "id": "webhook-header-auth",
+                    "name": "Webhook Header Auth"
+                }
+            }
         },
         {
             "parameters": {

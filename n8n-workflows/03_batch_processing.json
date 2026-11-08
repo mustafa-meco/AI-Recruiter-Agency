@@ -89,7 +89,9 @@
                 },
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ JSON.stringify({ resume_text: $json.resume_text, candidate_id: $json.candidate_id }) }}"
+                "jsonBody": "={{ JSON.stringify({ resume_text: $json.resume_text, candidate_id: $json.candidate_id }) }}",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpHeaderAuth"
             },
             "id": "call-pipeline",
             "name": "Call Main Pipeline",
@@ -98,7 +100,13 @@
             "position": [
                 980,
                 400
-            ]
+            ],
+            "credentials": {
+                "httpHeaderAuth": {
+                    "id": "webhook-header-auth",
+                    "name": "Webhook Header Auth"
+                }
+            }
         },
         {
             "parameters": {

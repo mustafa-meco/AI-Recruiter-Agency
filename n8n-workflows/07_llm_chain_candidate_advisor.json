@@ -21,7 +21,8 @@
             "parameters": {
                 "httpMethod": "POST",
                 "path": "llm-candidate-advisor",
-                "responseMode": "responseNode"
+                "responseMode": "responseNode",
+                "authentication": "headerAuth"
             },
             "id": "webhook",
             "name": "Webhook",
@@ -31,7 +32,13 @@
                 240,
                 300
             ],
-            "webhookId": "llm-candidate-advisor"
+            "webhookId": "llm-candidate-advisor",
+            "credentials": {
+                "httpHeaderAuth": {
+                    "id": "webhook-header-auth",
+                    "name": "Webhook Header Auth"
+                }
+            }
         },
         {
             "parameters": {
@@ -172,7 +179,7 @@
         },
         {
             "parameters": {
-                "jsCode": "const d = $input.first().json;\nconst name = d.extracted_profile?.personal_info?.name || 'Candidate';\nconst a = d.career_advice || {};\nconst li = arr => (arr||[]).map(x=>`<li>${x}</li>`).join('');\nreturn [{ json: { ...d,\n  email_subject: `Your AI Career Assessment — ${name}`,\n  email_html: `<h2>AI Career Assessment 🎯</h2><p>Hi ${name},</p><p><b>Overall:</b> ${a.overall_assessment}</p><h3>✅ Strengths</h3><ul>${li(a.strengths)}</ul><h3>📈 Skill Gaps</h3><ul>${li(a.skill_gaps)}</ul><h3>📝 CV Improvements</h3><ul>${li(a.cv_improvements)}</ul><h3>🚀 Career Paths</h3><ul>${li(a.career_suggestions)}</ul>`\n} }];"
+                "jsCode": "const d = $input.first().json;\nconst esc = v => String(v ?? '').replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\nconst name = esc(d.extracted_profile?.personal_info?.name || 'Candidate');\nconst a = d.career_advice || {};\nconst li = arr => (arr||[]).map(x=>`<li>${esc(x)}</li>`).join('');\nreturn [{ json: { ...d,\n  email_subject: `Your AI Career Assessment — ${name}`.replace(/[\\r\\n]+/g, ' '),\n  email_html: `<h2>AI Career Assessment 🎯</h2><p>Hi ${name},</p><p><b>Overall:</b> ${esc(a.overall_assessment)}</p><h3>✅ Strengths</h3><ul>${li(a.strengths)}</ul><h3>📈 Skill Gaps</h3><ul>${li(a.skill_gaps)}</ul><h3>📝 CV Improvements</h3><ul>${li(a.cv_improvements)}</ul><h3>🚀 Career Paths</h3><ul>${li(a.career_suggestions)}</ul>`\n} }];"
             },
             "id": "build-email",
             "name": "Build Email",
@@ -204,7 +211,8 @@
                     "id": "smtp-creds",
                     "name": "SMTP"
                 }
-            }
+            },
+            "disabled": true
         },
         {
             "parameters": {
